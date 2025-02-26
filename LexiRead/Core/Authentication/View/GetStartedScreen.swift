@@ -8,8 +8,6 @@
 import SwiftUI
 
 struct GetStartedScreen: View {
-    @State private var username: String = ""
-    @State private var password: String = ""
     
     var body: some View {
         VStack(spacing: 30) {
@@ -27,7 +25,7 @@ struct GetStartedScreen: View {
                     .foregroundColor(Color(UIColor.systemBlue))
             }
             .padding(.top, 60)
-            
+    
             VStack(spacing: 16) {
                 Text("Let's Get Started")
                     .font(.system(size: 28, weight: .bold))
@@ -42,26 +40,17 @@ struct GetStartedScreen: View {
             Spacer()
             
             // Login Button
-            Button(action: {
-                // Handle login action
-            }) {
-                Text("Log in")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(UIColor.systemBlue))
-                    .cornerRadius(28)
+            PrimaryButton(title: "Log in") {
+                
             }
-            .padding(.horizontal, 20)
             
-            // Sign in Button (which may actually be a sign up button)
             Button(action: {
                 // Handle sign in/up action
             }) {
                 Text("Sign in")
                     .font(.headline)
                     .foregroundColor(Color(UIColor.systemBlue))
+                    .frame(maxWidth:.infinity, minHeight: 56)
             }
             .padding(.bottom, 30)
         }

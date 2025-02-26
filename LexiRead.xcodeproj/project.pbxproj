@@ -7,12 +7,24 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F77BA0AF2D6303A30071D0A1 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = F77BA0AE2D6303A30071D0A1 /* Alamofire */; };
-		F77BA0B12D6303A30071D0A1 /* AlamofireDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = F77BA0B02D6303A30071D0A1 /* AlamofireDynamic */; };
+		F7B716EE2D6D8BCE00A1F9BC /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = F77BA0AE2D6303A30071D0A1 /* Alamofire */; settings = {ATTRIBUTES = (Weak, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		F7B7170C2D6D8D3600A1F9BC /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		F7588AD42D5A602D0090A06D /* LexiRead.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = LexiRead.app; path = "/Users/abdelrahmanatallah/Desktop/LexiRead/build/Debug-iphoneos/LexiRead.app"; sourceTree = "<absolute>"; };
+		F77058EE2D6D852200F963E6 /* LexiRead.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LexiRead.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -28,8 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F77BA0AF2D6303A30071D0A1 /* Alamofire in Frameworks */,
-				F77BA0B12D6303A30071D0A1 /* AlamofireDynamic in Frameworks */,
+				F7B716EE2D6D8BCE00A1F9BC /* Alamofire in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -40,6 +51,7 @@
 			isa = PBXGroup;
 			children = (
 				F7588AD62D5A602D0090A06D /* LexiRead */,
+				F77058EE2D6D852200F963E6 /* LexiRead.app */,
 			);
 			sourceTree = "<group>";
 		};
@@ -53,10 +65,13 @@
 				F7588AD02D5A602D0090A06D /* Sources */,
 				F7588AD12D5A602D0090A06D /* Frameworks */,
 				F7588AD22D5A602D0090A06D /* Resources */,
+				F7B7170C2D6D8D3600A1F9BC /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F7B717082D6D8BED00A1F9BC /* PBXTargetDependency */,
+				F7B7170A2D6D8BED00A1F9BC /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				F7588AD62D5A602D0090A06D /* LexiRead */,
@@ -64,10 +79,9 @@
 			name = LexiRead;
 			packageProductDependencies = (
 				F77BA0AE2D6303A30071D0A1 /* Alamofire */,
-				F77BA0B02D6303A30071D0A1 /* AlamofireDynamic */,
 			);
 			productName = LexiRead;
-			productReference = F7588AD42D5A602D0090A06D /* LexiRead.app */;
+			productReference = F77058EE2D6D852200F963E6 /* LexiRead.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -126,6 +140,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F7B717082D6D8BED00A1F9BC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = F7B717072D6D8BED00A1F9BC /* Alamofire */;
+		};
+		F7B7170A2D6D8BED00A1F9BC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = F7B717092D6D8BED00A1F9BC /* AlamofireDynamic */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F7588AE02D5A602F0090A06D /* Debug */ = {
@@ -261,8 +286,7 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -290,8 +314,7 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -345,7 +368,12 @@
 			package = F77BA0AD2D6303A30071D0A1 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
 		};
-		F77BA0B02D6303A30071D0A1 /* AlamofireDynamic */ = {
+		F7B717072D6D8BED00A1F9BC /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F77BA0AD2D6303A30071D0A1 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		F7B717092D6D8BED00A1F9BC /* AlamofireDynamic */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F77BA0AD2D6303A30071D0A1 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = AlamofireDynamic;
