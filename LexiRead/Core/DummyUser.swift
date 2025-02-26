@@ -78,103 +78,101 @@ struct UserListView: View {
 }
 
 
-#Preview {
-    LoginView()
-}
 
-struct LoginView: View {
-    var body: some View {
-        VStack(spacing: 0) {
-            // Status bar area
-            HStack {
-                Text("9:41")
-                    .font(.system(size: 16, weight: .semibold))
-                
-                Spacer()
-                
-                HStack(spacing: 5) {
-                    // Cell signal
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.system(size: 16))
-                    
-                    // WiFi
-                    Image(systemName: "wifi")
-                        .font(.system(size: 16))
-                    
-                    // Battery
-                    Image(systemName: "battery.100")
-                        .font(.system(size: 16))
-                }
-            }
-            .padding(.horizontal)
-            .padding(.top, 10)
-            
-            Spacer()
-                .frame(height: 160)
-            
-            // Logo
-//            LogoView()
-//                .frame(width: 85, height: 85)
-            
-            // App name
-            Text("LixeRead")
-                .font(.system(size: 36, weight: .bold))
-                .foregroundColor(Color(red: 0.27, green: 0.32, blue: 0.96))
-                .padding(.top, 8)
-            
-            Spacer()
-                .frame(height: 80)
-            
-            // Main content
-            VStack(spacing: 12) {
-                Text("Let's Get Started")
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(Color(red: 0.11, green: 0.11, blue: 0.44))
-                
-                Text("Log in or join us")
-                    .font(.system(size: 18))
-                    .foregroundColor(Color.gray)
-            }
-            
-            Spacer()
-            
-            // Buttons
-            VStack(spacing: 16) {
-                Button(action: {
-                    // Log in action
-                }) {
-                    Text("Log in")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(Color(red: 0.27, green: 0.32, blue: 0.96))
-                        .cornerRadius(27)
-                }
-                
-                Button(action: {
-                    // Sign in action
-                }) {
-                    Text("Sign in")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(Color(red: 0.27, green: 0.32, blue: 0.96))
-                }
-                .padding(.bottom, 40)
-            }
-            .padding(.horizontal, 24)
-            
-            // Home indicator
-            Rectangle()
-                .fill(Color.black)
-                .frame(width: 134, height: 5)
-                .cornerRadius(2.5)
-                .padding(.bottom, 8)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.white)
-        .edgesIgnoringSafeArea(.all)
-    }
-}
+
+//struct LoginView: View {
+//    var body: some View {
+//        VStack(spacing: 0) {
+//            // Status bar area
+//            HStack {
+//                Text("9:41")
+//                    .font(.system(size: 16, weight: .semibold))
+//                
+//                Spacer()
+//                
+//                HStack(spacing: 5) {
+//                    // Cell signal
+//                    Image(systemName: "antenna.radiowaves.left.and.right")
+//                        .font(.system(size: 16))
+//                    
+//                    // WiFi
+//                    Image(systemName: "wifi")
+//                        .font(.system(size: 16))
+//                    
+//                    // Battery
+//                    Image(systemName: "battery.100")
+//                        .font(.system(size: 16))
+//                }
+//            }
+//            .padding(.horizontal)
+//            .padding(.top, 10)
+//            
+//            Spacer()
+//                .frame(height: 160)
+//            
+//            // Logo
+////            LogoView()
+////                .frame(width: 85, height: 85)
+//            
+//            // App name
+//            Text("LixeRead")
+//                .font(.system(size: 36, weight: .bold))
+//                .foregroundColor(Color(red: 0.27, green: 0.32, blue: 0.96))
+//                .padding(.top, 8)
+//            
+//            Spacer()
+//                .frame(height: 80)
+//            
+//            // Main content
+//            VStack(spacing: 12) {
+//                Text("Let's Get Started")
+//                    .font(.system(size: 32, weight: .bold))
+//                    .foregroundColor(Color(red: 0.11, green: 0.11, blue: 0.44))
+//                
+//                Text("Log in or join us")
+//                    .font(.system(size: 18))
+//                    .foregroundColor(Color.gray)
+//            }
+//            
+//            Spacer()
+//            
+//            // Buttons
+//            VStack(spacing: 16) {
+//                Button(action: {
+//                    // Log in action
+//                }) {
+//                    Text("Log in")
+//                        .font(.system(size: 18, weight: .semibold))
+//                        .foregroundColor(.white)
+//                        .frame(maxWidth: .infinity)
+//                        .frame(height: 54)
+//                        .background(Color(red: 0.27, green: 0.32, blue: 0.96))
+//                        .cornerRadius(27)
+//                }
+//                
+//                Button(action: {
+//                    // Sign in action
+//                }) {
+//                    Text("Sign in")
+//                        .font(.system(size: 18, weight: .medium))
+//                        .foregroundColor(Color(red: 0.27, green: 0.32, blue: 0.96))
+//                }
+//                .padding(.bottom, 40)
+//            }
+//            .padding(.horizontal, 24)
+//            
+//            // Home indicator
+//            Rectangle()
+//                .fill(Color.black)
+//                .frame(width: 134, height: 5)
+//                .cornerRadius(2.5)
+//                .padding(.bottom, 8)
+//        }
+//        .frame(maxWidth: .infinity, maxHeight: .infinity)
+//        .background(Color.white)
+//        .edgesIgnoringSafeArea(.all)
+//    }
+//}
 struct CreateUserView: View {
     @StateObject private var viewModel = UserViewModel()
     @State private var name = ""

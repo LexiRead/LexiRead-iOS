@@ -10,51 +10,58 @@ import SwiftUI
 struct GetStartedScreen: View {
     
     var body: some View {
-        VStack(spacing: 30) {
-            // Logo placeholder - replace this with your image
-            VStack(spacing: 8) {
-                Image("logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 100, height: 70)
-                    .foregroundColor(Color(UIColor.systemBlue))
-                    .padding()
+        NavigationStack{
+            VStack(spacing: 30) {
+                // Logo placeholder - replace this with your image
+                VStack(spacing: 8) {
+                    Image("logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 100, height: 70)
+                        .foregroundColor(Color(UIColor.systemBlue))
+                        .padding()
+                    
+                    Text("LixeRead")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundColor(Color(UIColor.systemBlue))
+                }
+                .padding(.top, 60)
                 
-                Text("LixeRead")
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundColor(Color(UIColor.systemBlue))
-            }
-            .padding(.top, 60)
-    
-            VStack(spacing: 16) {
-                Text("Let's Get Started")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(Color.black)
+                VStack(spacing: 16) {
+                    Text("Let's Get Started")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(Color.black)
+                    
+                    
+                    Text("Log in or join us")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color.gray)
+                        .padding(.bottom, 20)
+                }
+                Spacer()
+                
+                // Login Button
+                NavigationLink {
+                    LoginScreen()
+                } label: {
+                    TextButton(title: "Log in")
+                }
+
                 
                 
-                Text("Log in or join us")
-                    .font(.system(size: 16))
-                    .foregroundColor(Color.gray)
-                    .padding(.bottom, 20)
+                Button(action: {
+                    // Handle sign in/up action
+                }) {
+                    Text("Sign in")
+                        .font(.headline)
+                        .foregroundColor(Color(UIColor.systemBlue))
+                        .frame(maxWidth:.infinity, minHeight: 56)
+                }
+                .padding(.bottom, 30)
             }
-            Spacer()
-            
-            // Login Button
-            PrimaryButton(title: "Log in") {
-                
-            }
-            
-            Button(action: {
-                // Handle sign in/up action
-            }) {
-                Text("Sign in")
-                    .font(.headline)
-                    .foregroundColor(Color(UIColor.systemBlue))
-                    .frame(maxWidth:.infinity, minHeight: 56)
-            }
-            .padding(.bottom, 30)
+            .padding()
+            .toolbarVisibility(.hidden)
         }
-        .padding()
     }
 }
 

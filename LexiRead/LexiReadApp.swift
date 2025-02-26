@@ -11,7 +11,10 @@ import SwiftUI
 struct LexiReadApp: App {
     var body: some Scene {
         WindowGroup {
-            GetStartedScreen()
+            NavigationView {
+                GetStartedScreen()
+                    .navigationBarHidden(true)
+            }
         }
     }
 }
