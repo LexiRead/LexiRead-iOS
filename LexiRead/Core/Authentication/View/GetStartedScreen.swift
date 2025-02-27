@@ -48,16 +48,14 @@ struct GetStartedScreen: View {
                 }
 
                 
-                
-                Button(action: {
-                    // Handle sign in/up action
-                }) {
-                    Text("Sign in")
+                NavigationLink {
+                    SignUPScreen()
+                } label: {
+                    Text("Sign up")
                         .font(.headline)
                         .foregroundColor(Color(UIColor.systemBlue))
                         .frame(maxWidth:.infinity, minHeight: 56)
                 }
-                .padding(.bottom, 30)
             }
             .padding()
             .toolbarVisibility(.hidden)
