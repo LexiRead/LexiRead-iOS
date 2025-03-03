@@ -12,7 +12,7 @@ struct LexiReadApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationView {
-                ChatScreen()
+                BooksScreen()
                     .navigationBarHidden(true)
             }
         }
