@@ -119,26 +119,28 @@ struct BooksScreen: View {
                 if selectedTab == 0 {
                     // Lixe Books
                     ForEach(viewModel.books) { book in
-                        PDFCard(
-                            title: book.title,
-                            subtitle: book.author,
-                            imageName: book.coverURL,
-                            isPDF: false
-                        ) {
-                            print("Selected book: \(book.title)")
+                        NavigationLink(destination: PDFReaderView()) {
+                            PDFCard(
+                                title: book.title,
+                                subtitle: book.author,
+                                imageName: book.coverURL,
+                                isPDF: false
+                            )
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 } else {
                     // My Files
                     ForEach(viewModel.pdfFiles) { pdf in
-                        PDFCard(
-                            title: pdf.filename,
-                            subtitle: "",
-                            imageName: "",
-                            isPDF: true
-                        ) {
-                            print("Selected PDF: \(pdf.filename)")
+                        NavigationLink(destination: PDFReaderView()) {
+                            PDFCard(
+                                title: pdf.filename,
+                                subtitle: "",
+                                imageName: "",
+                                isPDF: true
+                            )
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
             }
