@@ -7,47 +7,73 @@
 
 import SwiftUI
 
+// PDFCard.swift - Update this to handle URL images
 struct PDFCard: View {
     let title: String
     let subtitle: String
-    let imageName: String
+    let imageURL: String
     let isPDF: Bool
     
+    @State private var image: UIImage? = nil
+    
     var body: some View {
-        VStack {
+        VStack(alignment: .leading) {
+            // Cover image
             if isPDF {
-                Image(systemName: "doc.fill")
+                Image(systemName: "doc.text.fill")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 80, height: 100)
-                    .foregroundColor(.red)
-            } else {
-                // This would be replaced with AsyncImage for real implementation
-                // using the actual URL from the model
-                Image(imageName)
+                    .frame(height: 150)
+                    .foregroundColor(.gray)
+                    .padding()
+            } else if let loadedImage = image {
+                Image(uiImage: loadedImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 100, height: 120)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 150)
                     .cornerRadius(8)
+            } else {
+                Image(systemName: "book.fill")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 150)
+                    .foregroundColor(.gray)
+                    .padding()
             }
             
-            Text(title)
-                .font(.headline)
-                .multilineTextAlignment(.center)
-                .foregroundColor(.primary)
-            
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            // Text content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(2)
+                
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.vertical, 4)
         }
-        .frame(width: 150, height: 200)
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(radius: 2)
+        .onAppear {
+            // Load the image from URL if available
+            if !isPDF && !imageURL.isEmpty {
+                loadImageFromURL()
+            }
+        }
     }
-}
-
-#Preview {
-    PDFCard(title: "Hello", subtitle: "lkadf", imageName: "", isPDF: false)
+    
+    // Load image from URL
+    private func loadImageFromURL() {
+        guard let url = URL(string: imageURL) else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            if let data = data, let loadedImage = UIImage(data: data) {
+                DispatchQueue.main.async {
+                    self.image = loadedImage
+                }
+            }
+        }.resume()
+    }
 }

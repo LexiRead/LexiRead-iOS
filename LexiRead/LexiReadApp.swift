@@ -11,10 +11,7 @@ import SwiftUI
 struct LexiReadApp: App {
     var body: some Scene {
         WindowGroup {
-            NavigationView {
-                CommunityScreen()
-                    .navigationBarHidden(true)
-            }
+            MainTabView()
         }
     }
 }

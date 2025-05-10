@@ -18,7 +18,7 @@ struct FloatingActionButton: View {
                 Button(action: action) {
                     ZStack {
                         Circle()
-                            .foregroundColor(Color(UIColor(red: 0.27, green: 0.27, blue: 0.94, alpha: 1.0)))
+                            .foregroundColor(.main)
                             .frame(width: 60, height: 60)
                             .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
                         

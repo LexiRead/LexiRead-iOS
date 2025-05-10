@@ -23,7 +23,7 @@ struct LRTextField: View {
             // Field title
             Text(title)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(Color(UIColor.darkText))
+                .foregroundColor(Color(.primary900))
             
             // Custom text field with optional secure entry
             HStack {
