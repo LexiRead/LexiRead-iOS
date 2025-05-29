@@ -166,8 +166,16 @@
 // ChatScreen.swift
 import SwiftUI
 
+// Update ChatScreen to accept an optional initial message
 struct ChatScreen: View {
-    @StateObject private var viewModel = ChatViewModel()
+    @StateObject private var viewModel: ChatViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
+    // Initialize with optional initial text
+    init(initialText: String? = nil) {
+        // Use StateObject with a custom initializer that takes the initial text
+        _viewModel = StateObject(wrappedValue: ChatViewModel(initialText: initialText))
+    }
     
     var body: some View {
         VStack {
@@ -195,6 +203,10 @@ struct ChatScreen: View {
             // Input Field
             InputFieldView(viewModel: viewModel)
         }
+        // Add a close button in the navigation bar
+        .navigationBarItems(trailing: Button("Close") {
+            presentationMode.wrappedValue.dismiss()
+        })
     }
 }
 
@@ -380,3 +392,67 @@ struct InputFieldView: View {
 #Preview {
     ChatScreen()
 }
+
+
+//
+//  ChatViewModel.swift
+//  LexiRead
+//
+//  Created by Abd Elrahman Atallah on 02/03/2025.
+//
+
+import Foundation
+
+struct Message: Identifiable, Equatable {
+    let id = UUID()
+    let content: String
+    let isFromUser: Bool
+    let timestamp: Date = Date()
+}
+// Expected response structure - adjust based on your API
+struct BotResponse: Decodable {
+    let reply: String
+}
+
+class ChatViewModel: ObservableObject {
+    @Published var messages: [Message] = []
+    @Published var inputText: String = ""
+    @Published var isLoading: Bool = false
+    @Published var showDeleteAlert = false
+    @Published var showClearChatPopover = false
+
+    private let apiURL = "YOUR_API_ENDPOINT_HERE"
+    
+    // Initialize with optional initial text
+    init(initialText: String? = nil) {
+        if let text = initialText {
+            self.inputText = text
+        }
+    }
+    
+    func sendMessage() {
+        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        // Add user message to the chat
+        let userMessage = Message(content: inputText, isFromUser: true)
+        messages.append(userMessage)
+        
+        // Store the input and clear it
+        let messageToSend = inputText
+        inputText = ""
+        
+        // Show loading state
+        isLoading = true
+        
+        // Simulate response (to be replaced with actual API call later)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self = self else { return }
+            self.isLoading = false
+            
+            // Add a simulated bot response
+            let botMessage = Message(content: "I'm still learning about that. Check back later when the API is integrated!", isFromUser: false)
+            self.messages.append(botMessage)
+        }
+    }
+}
+

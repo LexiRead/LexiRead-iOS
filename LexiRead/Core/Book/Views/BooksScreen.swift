@@ -8,6 +8,7 @@
 import SwiftUI
 import Combine
 import PDFKit
+import AVFoundation
 
 // MARK: - Models
 struct Book: Identifiable, Codable {
@@ -697,6 +698,7 @@ class PDFService {
 class TranslationService {
     static let shared = TranslationService()
     private let baseURL = "http://app.elfar5a.com/api/translate"
+    var cancellables = Set<AnyCancellable>()
     
     private init() {}
     
@@ -793,6 +795,173 @@ class TranslationService {
             sourceLanguage: sourceLanguage,
             targetLanguage: targetLanguage
         )
+    }
+    
+    
+    func textToSpeech(text: String, language: String = "en") -> AnyPublisher<String, APIError> {
+        // Create the URL
+        guard let url = URL(string: "http://app.elfar5a.com/api/tspeech/tts") else {
+            return Fail(error: APIError.invalidURL).eraseToAnyPublisher()
+        }
+        
+        // Create the request
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Add authentication token if available
+        if let token = UserManager.shared.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Create the request body
+        let parameters: [String: Any] = [
+            "text": text,
+            "lang": language
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: parameters)
+        } catch {
+            return Fail(error: APIError.unknown("Failed to serialize text-to-speech request")).eraseToAnyPublisher()
+        }
+        
+        print("Requesting text-to-speech for: \(text)")
+        
+        // Make the network request
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Data in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+                
+                print("TTS response status: \(httpResponse.statusCode)")
+                
+                if !(200...299).contains(httpResponse.statusCode) {
+                    let errorStr = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    print("TTS error response: \(errorStr)")
+                    throw APIError.serverError("Server returned status code \(httpResponse.statusCode)")
+                }
+                
+                return data
+            }
+            .tryMap { data -> String in
+                // Print the response for debugging
+                let responseStr = String(data: data, encoding: .utf8) ?? "Unknown response"
+                print("TTS response: \(responseStr)")
+                
+                // Parse the JSON response
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let audioURL = json["audio_url"] as? String else {
+                    throw APIError.invalidData
+                }
+                
+                return audioURL
+            }
+            .mapError { error in
+                if let apiError = error as? APIError {
+                    return apiError
+                }
+                
+                if let error = error as? DecodingError {
+                    print("JSON parsing error: \(error)")
+                    return APIError.invalidData
+                }
+                
+                return APIError.mapError(error)
+            }
+            .eraseToAnyPublisher()
+    }
+
+    // Add this to play the audio from a URL
+    func playAudio(from urlString: String, completion: @escaping () -> Void = {}) {
+        AudioPlayerManager.shared.playAudio(from: urlString, completion: completion)
+    }
+}
+
+
+class AudioPlayerManager {
+    static let shared = AudioPlayerManager()
+    
+    private var player: AVPlayer?
+    private var playerItem: AVPlayerItem?
+    private var timeObserver: Any?
+    private var completionHandler: (() -> Void)?
+    
+    private init() {}
+    
+    func playAudio(from urlString: String, completion: @escaping () -> Void) {
+        guard let url = URL(string: urlString) else {
+            print("Invalid audio URL")
+            completion()
+            return
+        }
+        
+        // Create player item
+        playerItem = AVPlayerItem(url: url)
+        
+        // Create player
+        player = AVPlayer(playerItem: playerItem)
+        
+        // Add observer for when playback ends
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerDidFinishPlaying),
+            name: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem
+        )
+        
+        // Store completion handler
+        completionHandler = completion
+        
+        // Ensure audio plays even when device is muted
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Failed to set audio session category: \(error)")
+        }
+        
+        // Start playing
+        player?.play()
+        
+        print("Playing audio from: \(urlString)")
+    }
+    
+    @objc private func playerDidFinishPlaying() {
+        // Clean up
+        cleanUp()
+        
+        // Call completion handler
+        completionHandler?()
+        completionHandler = nil
+    }
+    
+    func stopPlayback() {
+        player?.pause()
+        cleanUp()
+        completionHandler?()
+        completionHandler = nil
+    }
+    
+    private func cleanUp() {
+        // Remove observer
+        NotificationCenter.default.removeObserver(
+            self,
+            name: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem
+        )
+        
+        // Reset audio session
+        do {
+            try AVAudioSession.sharedInstance().setActive(false)
+        } catch {
+            print("Failed to deactivate audio session: \(error)")
+        }
+        
+        // Clear player and item
+        player = nil
+        playerItem = nil
     }
 }
 
@@ -1827,6 +1996,9 @@ struct TranslationPopupView: View {
     let translationResult: TranslationResult
     let isTranslating: Bool
     let onDismiss: () -> Void
+    @State private var isPlayingAudio = false
+    @State private var audioURL: String?
+    @State private var showChatSheet = false  // Add this for the sheet
     
     var body: some View {
         VStack(alignment: .trailing, spacing: 16) {
@@ -1872,16 +2044,21 @@ struct TranslationPopupView: View {
             
             // Action buttons
             HStack(spacing: 20) {
-                ActionButton(icon: "speaker.wave.2", title: "Speak") {
-                    // TODO: Implement text-to-speech
-                    /api/tspeech/tts this is the end point 
+                AudioButton(
+                    text: translationResult.originalText,
+                    language: translationResult.sourceLanguage,
+                    isPlaying: $isPlayingAudio,
+                    audioURL: $audioURL
+                )
+                
+                // Replace the heart icon with chatbot for Lixe Bot
+                ActionButton(icon: "chatbot", title: "Lixe Bot") {
+                    // Prepare the question for the chatbot using the original word
+                    let chatQuestion = "What is the meaning of \"\(translationResult.originalText)\"?"
+                    showChatSheet = true
                 }
                 
-                ActionButton(icon: "heart", title: "Save") {
-                    // TODO: Implement save to favorites
-                }
-                
-                ActionButton(icon: "square.and.arrow.up", title: "Share") {
+                ActionButton(icon: "wallet.pass", title: "Copy") {
                     // TODO: Implement share functionality
                 }
                 
@@ -1895,9 +2072,17 @@ struct TranslationPopupView: View {
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
+        // Add sheet presentation for ChatScreen
+        .sheet(isPresented: $showChatSheet) {
+            NavigationView {
+                // Pass the question about the word to the ChatScreen
+                ChatScreen(initialText: "What is the meaning of \"\(translationResult.translatedText)\"?")
+            }
+        }
     }
 }
 
+// Create a specific action button for the chatbot
 struct ActionButton: View {
     let icon: String
     let title: String
@@ -1906,7 +2091,7 @@ struct ActionButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
+                Image(icon)
                     .font(.system(size: 20))
                     .foregroundColor(.primary900)
                 
@@ -1917,6 +2102,79 @@ struct ActionButton: View {
         }
     }
 }
+
+// Create a dedicated audio button component
+struct AudioButton: View {
+    let text: String
+    let language: String
+    @Binding var isPlaying: Bool
+    @Binding var audioURL: String?
+    @State private var isLoading = false
+    
+    var body: some View {
+        Button(action: {
+            playAudio()
+        }) {
+            VStack(spacing: 4) {
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .frame(width: 20, height: 20)
+                } else {
+                    Image(systemName: isPlaying ? "speaker.wave.3.fill" : "speaker.wave.2")
+                        .font(.system(size: 20))
+                        .foregroundColor(.primary900)
+                }
+                
+                Text("Speak")
+                    .font(.caption2)
+                    .foregroundColor(.primary900)
+            }
+        }
+        .disabled(isLoading || isPlaying)
+    }
+    
+    private func playAudio() {
+        // If we already have an audio URL, play it
+        if let existingURL = audioURL {
+            isPlaying = true
+            
+            TranslationService.shared.playAudio(from: existingURL) {
+                DispatchQueue.main.async {
+                    self.isPlaying = false
+                }
+            }
+            return
+        }
+        
+        // Otherwise request a new audio URL
+        isLoading = true
+        
+        TranslationService.shared.textToSpeech(text: text, language: language)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    isLoading = false
+                    
+                    if case .failure(let error) = completion {
+                        print("Audio error: \(error)")
+                    }
+                },
+                receiveValue: { url in
+                    audioURL = url
+                    isPlaying = true
+                    
+                    TranslationService.shared.playAudio(from: url) {
+                        DispatchQueue.main.async {
+                            self.isPlaying = false
+                        }
+                    }
+                }
+            )
+            .store(in: &TranslationService.shared.cancellables)
+    }
+}
+
 
 // MARK: - Document Picker
 struct DocumentPickerView: UIViewControllerRepresentable {
