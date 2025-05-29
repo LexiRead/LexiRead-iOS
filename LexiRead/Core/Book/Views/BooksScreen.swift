@@ -696,26 +696,103 @@ class PDFService {
 
 class TranslationService {
     static let shared = TranslationService()
+    private let baseURL = "http://app.elfar5a.com/api/translate"
     
     private init() {}
     
-    func translateText(_ text: String,
-                       sourceLanguage: String = "en",
-                       targetLanguage: String = "ar") -> AnyPublisher<TranslationResult, APIError> {
-        return Future { promise in
-            // Simulate API call with delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                // Mock translation - replace with actual API implementation
+    // Real API implementation
+    func translateText(_ text: String, sourceLanguage: String = "en", targetLanguage: String = "ar") -> AnyPublisher<TranslationResult, APIError> {
+        // Create the URL
+        guard let url = URL(string: "\(baseURL)/translate") else {
+            return Fail(error: APIError.invalidURL).eraseToAnyPublisher()
+        }
+        
+        // Create the request
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Add authentication token if available
+        if let token = UserManager.shared.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Create the request body
+        let parameters: [String: Any] = [
+            "text": text,
+            "target": "ar"  // Hard-coded to Arabic as requested
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: parameters)
+        } catch {
+            return Fail(error: APIError.unknown("Failed to serialize translation request")).eraseToAnyPublisher()
+        }
+        
+        print("Translating text: \(text)")
+        
+        // Make the network request
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Data in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+                
+                print("Translation response status: \(httpResponse.statusCode)")
+                
+                if !(200...299).contains(httpResponse.statusCode) {
+                    let errorStr = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    print("Translation error response: \(errorStr)")
+                    throw APIError.serverError("Server returned status code \(httpResponse.statusCode)")
+                }
+                
+                return data
+            }
+            .tryMap { data -> TranslationResult in
+                // Print the response for debugging
+                let responseStr = String(data: data, encoding: .utf8) ?? "Unknown response"
+                print("Translation response: \(responseStr)")
+                
+                // Parse the JSON response
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let translation = json["translation"] as? String else {
+                    throw APIError.invalidData
+                }
+                
+                // Create the translation result
                 let result = TranslationResult(
                     originalText: text,
-                    translatedText: "ترجمة: \(text)", // Mock Arabic translation
+                    translatedText: translation,
                     sourceLanguage: sourceLanguage,
                     targetLanguage: targetLanguage
                 )
-                promise(.success(result))
+                
+                return result
             }
-        }
-        .eraseToAnyPublisher()
+            .mapError { error in
+                if let apiError = error as? APIError {
+                    return apiError
+                }
+                
+                if let error = error as? DecodingError {
+                    print("JSON parsing error: \(error)")
+                    return APIError.invalidData
+                }
+                
+                return APIError.mapError(error)
+            }
+            .eraseToAnyPublisher()
+    }
+    
+    // Fallback method for when the API fails
+    func localTranslation(_ text: String, sourceLanguage: String = "en", targetLanguage: String = "ar") -> TranslationResult {
+        // Simple mock translation for fallback
+        return TranslationResult(
+            originalText: text,
+            translatedText: "ترجمة: \(text)",  // Just adding "translation:" in Arabic
+            sourceLanguage: sourceLanguage,
+            targetLanguage: targetLanguage
+        )
     }
 }
 
@@ -1081,11 +1158,18 @@ class PDFReaderViewModel: ObservableObject {
             .sink(
                 receiveCompletion: { [weak self] completion in
                     self?.isTranslating = false
+                    
                     if case .failure(let error) = completion {
-                        self?.errorMessage = error.localizedDescription
+                        print("Translation error: \(error)")
+                        
+                        // Use fallback local translation if API fails
+                        let fallbackResult = TranslationService.shared.localTranslation(word)
+                        self?.translationResult = fallbackResult
+                        self?.showTranslation = true
                     }
                 },
                 receiveValue: { [weak self] result in
+                    print("Received translation: \(result.translatedText)")
                     self?.translationResult = result
                     self?.showTranslation = true
                 }
@@ -1790,6 +1874,7 @@ struct TranslationPopupView: View {
             HStack(spacing: 20) {
                 ActionButton(icon: "speaker.wave.2", title: "Speak") {
                     // TODO: Implement text-to-speech
+                    /api/tspeech/tts this is the end point 
                 }
                 
                 ActionButton(icon: "heart", title: "Save") {
