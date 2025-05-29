@@ -507,7 +507,7 @@ extension BooksViewModel {
         }
         
         // Use HTML link and convert
-        if let htmlURLString = downloadLinks.text_html, !htmlURLString.isEmpty,
+        if let htmlURLString = downloadLinks.textHTML, !htmlURLString.isEmpty,
            let htmlURL = URL(string: htmlURLString) {
             print("Using HTML link for conversion: \(htmlURLString)")
             

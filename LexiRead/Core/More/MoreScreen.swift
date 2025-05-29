@@ -1,10 +1,5 @@
-//
-//  MoreScreen.swift
-//  LexiRead
-//
-//  Created by Abd Elrahman Atallah on 03/04/2025.
-//
 import SwiftUI
+import Combine
 
 // MARK: - Models
 struct MenuItem: Identifiable {
@@ -35,37 +30,66 @@ class MoreScreenViewModel: ObservableObject {
     @Published var sections: [MenuSection]
     @Published var standaloneItems: [MenuItem]
     
+    // Initialize cancellables before using it in closures
+    private var cancellables = Set<AnyCancellable>()
+    
     init() {
-        // Initialize with collapsible sections and their items
+        // First initialize all properties
+        self.sections = []
+        self.standaloneItems = []
+        
+        // Then set up the sections with their items
         self.sections = [
             MenuSection(
                 title: "Settings",
-                icon: "gearshape",
-                isExpanded: false,
+                icon: "gear",
+                isExpanded: true,
                 items: [
-                    MenuItem(icon: "globe", title: "Language"),
-                    MenuItem(icon: "doc.text.magnifyingglass", title: "Translation Source"),
-                    MenuItem(icon: "arrow.triangle.2.circlepath", title: "Choose Translation Engine")
+                    MenuItem(icon: "character.bubble", title: "Translation Language") {
+                        // Translation Language screen
+                    },
+                    MenuItem(icon: "square.grid.2x2", title: "Translation Engine") {
+                        // Translation Engine screen
+                    }
                 ]
             ),
             MenuSection(
                 title: "Personal Info & Privacy",
-                icon: "gearshape",
+                icon: "gear",
                 isExpanded: false,
                 items: [
-                    MenuItem(icon: "person", title: "Personal Info"),
-                    MenuItem(icon: "lock", title: "Change Password"),
-                    MenuItem(icon: "trash", title: "Delete Account")
+                    MenuItem(icon: "person", title: "Personal Info") {
+                        // Personal Info screen
+                    },
+                    MenuItem(icon: "lock", title: "Change Password") {
+                        // Change Password screen
+                    },
+                    MenuItem(icon: "trash", title: "Delete Account") {
+                        // Delete Account screen
+                    }
                 ]
             )
         ]
         
-        // Initialize standalone items
+        // Set up standalone items
         self.standaloneItems = [
-            MenuItem(icon: "person", title: "Invite Your Friends"),
-            MenuItem(icon: "star", title: "Rate Us"),
-            MenuItem(icon: "arrow.left.circle", title: "Logout", showChevron: true) {
-                print("Logout tapped")
+            MenuItem(icon: "person.2", title: "Invite Your Friends") {
+                // Invite Friends screen
+            },
+            MenuItem(icon: "star", title: "Rate Us") {
+                // Rate Us action
+            },
+            MenuItem(icon: "arrow.left.circle", title: "Logout", showChevron: true) { [weak self] in
+                // Use weak self to avoid retain cycles
+                guard let self = self else { return }
+                
+                // Logout action
+                AuthService.shared.logout()
+                    .receive(on: DispatchQueue.main)
+                    .sink { _ in
+                        UserManager.shared.clearUserData()
+                    }
+                    .store(in: &self.cancellables)
             }
         ]
     }
@@ -75,8 +99,8 @@ class MoreScreenViewModel: ObservableObject {
     }
     
     func handleItemTap(title: String) {
-        print("Tapped on: \(title)")
-        // Add specific actions based on which item was tapped
+        print("Navigating to: \(title)")
+        // Navigation logic is handled in the individual MenuItem actions
     }
 }
 
@@ -116,6 +140,16 @@ struct MoreScreen: View {
             }
             .navigationTitle("More")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        // Search action
+                    }) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.primary900)
+                    }
+                }
+            }
         }
     }
 }
@@ -123,19 +157,18 @@ struct MoreScreen: View {
 struct LexiBotCard: View {
     var body: some View {
         HStack {
-            Image(systemName: "waveform.circle.fill")
+            Image("chatbotmore")
                 .resizable()
-                .frame(width: 30, height: 30)
-                .foregroundColor(.blue)
-            
+                .frame(width: 24, height: 24)
             Text("Lexi Bot")
                 .font(.title3)
                 .fontWeight(.medium)
+                .foregroundColor(.primary)
             
             Spacer()
         }
         .padding()
-        .background(Color.white)
+        .background(.natural100)
         .cornerRadius(12)
     }
 }
@@ -152,11 +185,15 @@ struct CollapsibleSectionView: View {
                 HStack {
                     Image(systemName: section.icon)
                         .resizable()
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                         .foregroundColor(.blue)
+                        .padding(8)
+                        .background(Color.blue.opacity(0.1))
+                        .clipShape(Circle())
                     
                     Text(section.title)
                         .font(.headline)
+                        .foregroundColor(.primary)
                     
                     Spacer()
                     
@@ -195,11 +232,15 @@ struct MenuItemView: View {
             HStack {
                 Image(systemName: item.icon)
                     .resizable()
-                    .frame(width: 22, height: 22)
+                    .frame(width: 24, height: 24)
                     .foregroundColor(.blue)
+                    .padding(8)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
                 
                 Text(item.title)
                     .font(.body)
+                    .foregroundColor(.primary)
                 
                 Spacer()
                 
@@ -210,7 +251,6 @@ struct MenuItemView: View {
             }
             .padding()
             .background(Color.white)
-            .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
     }

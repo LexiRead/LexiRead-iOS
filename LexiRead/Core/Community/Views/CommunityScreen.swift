@@ -7,7 +7,7 @@ import Alamofire
 struct CommunityScreen: View {
     @State private var selectedTab = 0
     @StateObject private var viewModel = CommunityViewModel()
-    private let appBlueColor = Color(UIColor(red: 0.27, green: 0.27, blue: 0.94, alpha: 1.0))
+    private let appBlueColor = Color(.primary900)
     
     var body: some View {
         NavigationView {
@@ -196,8 +196,8 @@ struct MyPostsView: View {
                     
                     Button("Post") {
                         if !newPostText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            // Create and add the new post
-                            createNewPost()
+                            // Create new post using the API
+                            viewModel.addPost(content: newPostText)
                             newPostText = ""
                             showingPostSheet = false
                         }
@@ -215,11 +215,11 @@ struct MyPostsView: View {
                         .fill(Color.gray.opacity(0.3))
                         .frame(width: 40, height: 40)
                         .overlay(
-                            Text("G")
+                            Text("a")
                                 .foregroundColor(.gray)
                         )
                     
-                    Text("Guy Hawkins")
+                    Text("ahmeddd")
                         .font(.headline)
                     
                     Spacer()
@@ -235,27 +235,8 @@ struct MyPostsView: View {
             }
         }
         .onAppear {
-            // Load sample data for my posts
-            viewModel.myPosts = [
-                Post(id: "1", userFullName: "Guy Hawkins", content: "emak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw s", timeAgo: "45 minutes ago", commentCount: 45, userProfileImage: nil),
-                Post(id: "2", userFullName: "Guy Hawkins", content: "emak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw s", timeAgo: "45 minutes ago", commentCount: 45, userProfileImage: nil)
-            ]
+            viewModel.fetchMyPosts()
         }
-    }
-    
-    // Function to create a new post
-    private func createNewPost() {
-        let newPost = Post(
-            id: UUID().uuidString,
-            userFullName: "Guy Hawkins",
-            content: newPostText,
-            timeAgo: "Just now",
-            commentCount: 0,
-            userProfileImage: nil
-        )
-        
-        // Add to the beginning of the posts array
-        viewModel.myPosts.insert(newPost, at: 0)
     }
 }
 
@@ -426,6 +407,10 @@ struct PostDetailView: View {
 //
 
 import Foundation
+import SwiftUI
+
+import Foundation
+import SwiftUI
 
 class CommunityViewModel: ObservableObject {
     @Published var forYouPosts: [Post] = []
@@ -433,51 +418,90 @@ class CommunityViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     
-    private let forYouEndpoint = "YOUR_API_URL/for_you"
-    private let myPostsEndpoint = "YOUR_API_URL/my_posts"
-    
     func fetchForYouPosts() {
-        self.loadSampleData()
+        isLoading = true
+        errorMessage = nil
         
+        NetworkingService.shared.fetchCommunityPosts { [weak self] result in
+            guard let self = self else { return }
+            
+            self.isLoading = false
+            
+            switch result {
+            case .success(let posts):
+                self.forYouPosts = posts
+                if posts.isEmpty {
+                    self.errorMessage = "No posts available"
+                }
+            case .failure(let error):
+                self.errorMessage = "Failed to load posts: \(error.localizedDescription)"
+                print("Error fetching for you posts: \(error)")
+            }
+        }
     }
     
     func fetchMyPosts() {
-      
+        isLoading = true
+        errorMessage = nil
+        
+        NetworkingService.shared.fetchMyPosts { [weak self] result in
+            guard let self = self else { return }
+            
+            self.isLoading = false
+            
+            switch result {
+            case .success(let posts):
+                self.myPosts = posts
+                if posts.isEmpty {
+                    self.errorMessage = "No posts available"
+                }
+            case .failure(let error):
+                self.errorMessage = "Failed to load posts: \(error.localizedDescription)"
+                print("Error fetching my posts: \(error)")
+            }
+        }
     }
-    
-    // Sample data for development and preview
-    private func loadSampleData() {
-        forYouPosts = [
-            Post(id: "1", userFullName: "Wade Warren", content: "emak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw s", timeAgo: "45 minutes ago", commentCount: 45, userProfileImage: nil),
-            Post(id: "2", userFullName: "Bessie Cooper", content: "emak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw s", timeAgo: "45 minutes ago", commentCount: 45, userProfileImage: nil),
-            Post(id: "3", userFullName: "Bessie Cooper", content: "emak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw semak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg jerawatan. di emak gw mah fine2 aja ga ngpa2 gw s", timeAgo: "45 minutes ago", commentCount: 45, userProfileImage: nil)
-        ]
-    }
-    
     
     func deletePost(postId: String) {
-        // In a real app, this would call an API
-        // For now, we'll just remove it from the local array
-        myPosts.removeAll { $0.id == postId }
+        isLoading = true
+        errorMessage = nil
+        
+        NetworkingService.shared.deletePost(postId: postId) { [weak self] result in
+            guard let self = self else { return }
+            
+            self.isLoading = false
+            
+            switch result {
+            case .success(_):
+                // Remove post from local array
+                self.myPosts.removeAll { $0.id == postId }
+            case .failure(let error):
+                self.errorMessage = "Failed to delete post: \(error.localizedDescription)"
+                print("Error deleting post: \(error)")
+            }
+        }
     }
-    
     
     func addPost(content: String) {
-        // In a real app, you would make an API call
-        let newPost = Post(
-            id: UUID().uuidString,
-            userFullName: "Guy Hawkins",
-            content: content,
-            timeAgo: "Just now",
-            commentCount: 0,
-            userProfileImage: nil
-        )
+        isLoading = true
+        errorMessage = nil
         
-        myPosts.insert(newPost, at: 0)
+        NetworkingService.shared.createPost(content: content) { [weak self] result in
+            guard let self = self else { return }
+            
+            self.isLoading = false
+            
+            switch result {
+            case .success(let post):
+                // Add new post to the top of the list
+                self.myPosts.insert(post, at: 0)
+            case .failure(let error):
+                self.errorMessage = "Failed to create post: \(error.localizedDescription)"
+                print("Error creating post: \(error)")
+            }
+        }
     }
 }
-
-
 
 //MARK: - PostDetailViewModel
 
@@ -496,44 +520,608 @@ class PostDetailViewModel: ObservableObject {
     @Published var errorMessage: String?
     
     private let postId: String
-    private let commentsEndpoint: String
-    private let postCommentEndpoint: String
     
     init(postId: String) {
-        
         self.postId = postId
-        self.commentsEndpoint = "YOUR_API_URL/posts/\(postId)/comments"
-        self.postCommentEndpoint = "YOUR_API_URL/posts/\(postId)/comment"
-        
-        // For demo/preview purposes, load sample data
-        self.loadSampleData()
     }
     
     func fetchComments() {
-       
+        isLoading = true
+        errorMessage = nil
+        
+        NetworkingService.shared.fetchPostComments(postId: postId) { [weak self] result in
+            guard let self = self else { return }
+            
+            self.isLoading = false
+            
+            switch result {
+            case .success(let comments):
+                self.comments = comments
+                if comments.isEmpty {
+                    self.errorMessage = "No comments yet"
+                }
+            case .failure(let error):
+                self.errorMessage = "Failed to load comments: \(error.localizedDescription)"
+                print("Error fetching comments: \(error)")
+            }
+        }
     }
     
     func postComment(content: String) {
+        isLoading = true
+        errorMessage = nil
         
+        NetworkingService.shared.postComment(postId: postId, content: content) { [weak self] result in
+            guard let self = self else { return }
+            
+            self.isLoading = false
+            
+            switch result {
+            case .success(let comment):
+                // Add new comment to the top of the list
+                self.comments.insert(comment, at: 0)
+            case .failure(let error):
+                self.errorMessage = "Failed to post comment: \(error.localizedDescription)"
+                print("Error posting comment: \(error)")
+            }
+        }
+    }
+}
+
+
+
+
+//MARK: - api service
+
+import Foundation
+
+enum NetworkError: Error {
+    case invalidURL
+    case requestFailed
+    case decodingFailed
+    case noData
+    
+    var localizedDescription: String {
+        switch self {
+        case .invalidURL:
+            return "Invalid URL"
+        case .requestFailed:
+            return "Network request failed"
+        case .decodingFailed:
+            return "Failed to decode response"
+        case .noData:
+            return "No data received"
+        }
+    }
+}
+
+class NetworkingService {
+    static let shared = NetworkingService()
+    
+    private let baseURL = "http://40.76.247.35/api"
+    private let token = "5|I3mh0xpU8GilTs5AlAq268eH5AuE323iDd6XWMHU463338e6"
+    
+    private init() {}
+    
+    // MARK: - Create URL Request
+    private func createRequest(url: URL, method: String) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // For demo purposes, add a mock comment
-        let newComment = Comment(
-            id: UUID().uuidString,
-            userFullName: "Current User",
-            content: content,
-            timeAgo: "Just now",
-            userProfileImage: nil
-        )
+        // Log the request in debug mode
+        logNetworkRequest(request)
         
-        self.comments.insert(newComment, at: 0)
+        return request
     }
     
-    // Sample data for development and preview
-    private func loadSampleData() {
-        comments = [
-            Comment(id: "1", userFullName: "Jane Cooper", content: "emak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg gw s", timeAgo: "45 minutes ago", userProfileImage: nil),
-            Comment(id: "2", userFullName: "Cameron Williamson", content: "emak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg gw s", timeAgo: "45 minutes ago", userProfileImage: nil),
-            Comment(id: "3", userFullName: "Leslie Alexander", content: "emak gw yg make ni,w nyoba2 tp gabgt di komuk lgsg gw s", timeAgo: "45 minutes ago", userProfileImage: nil)
-        ]
+    // MARK: - Fetch Community Posts (For You)
+    func fetchCommunityPosts(completion: @escaping (Result<[Post], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/community/posts") else {
+            completion(.failure(NetworkError.invalidURL))
+            return
+        }
+        
+        let request = createRequest(url: url, method: "GET")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            // Log response for debugging
+            logNetworkResponse(data: data, response: response, error: error)
+            
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.noData))
+                }
+                return
+            }
+            
+            do {
+                let postsResponse = try JSONDecoder().decode(PaginatedPostsResponse.self, from: data)
+                
+                let posts = postsResponse.data.data.map { postData in
+                    Post(
+                        id: String(postData.id),
+                        userFullName: postData.user.name,
+                        content: postData.content,
+                        timeAgo: postData.created_at,
+                        commentCount: postData.comments_count,
+                        userProfileImage: postData.user.avatar.isEmpty ? nil : postData.user.avatar,
+                        isLiked: postData.is_liked,
+                        canEdit: postData.can_edit,
+                        image: postData.image.isEmpty ? nil : postData.image
+                    )
+                }
+                
+                DispatchQueue.main.async {
+                    completion(.success(posts))
+                }
+            } catch {
+                print("Error decoding community posts: \(error)")
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.decodingFailed))
+                }
+            }
+        }.resume()
     }
+    
+    // MARK: - Fetch My Posts
+    func fetchMyPosts(completion: @escaping (Result<[Post], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/community/user/posts") else {
+            completion(.failure(NetworkError.invalidURL))
+            return
+        }
+        
+        let request = createRequest(url: url, method: "GET")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            // Log response for debugging
+            logNetworkResponse(data: data, response: response, error: error)
+            
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.noData))
+                }
+                return
+            }
+            
+            do {
+                let postsResponse = try JSONDecoder().decode(PaginatedPostsResponse.self, from: data)
+                
+                let posts = postsResponse.data.data.map { postData in
+                    Post(
+                        id: String(postData.id),
+                        userFullName: postData.user.name,
+                        content: postData.content,
+                        timeAgo: postData.created_at,
+                        commentCount: postData.comments_count,
+                        userProfileImage: postData.user.avatar.isEmpty ? nil : postData.user.avatar,
+                        isLiked: postData.is_liked,
+                        canEdit: postData.can_edit,
+                        image: postData.image.isEmpty ? nil : postData.image
+                    )
+                }
+                
+                DispatchQueue.main.async {
+                    completion(.success(posts))
+                }
+            } catch {
+                print("Error decoding my posts: \(error)")
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.decodingFailed))
+                }
+            }
+        }.resume()
+    }
+    
+    // MARK: - Create Post
+    func createPost(content: String, completion: @escaping (Result<Post, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/community/posts") else {
+            completion(.failure(NetworkError.invalidURL))
+            return
+        }
+        
+        var request = createRequest(url: url, method: "POST")
+        
+        let parameters = ["content": content]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: parameters)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            // Log response for debugging
+            logNetworkResponse(data: data, response: response, error: error)
+            
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.noData))
+                }
+                return
+            }
+            
+            do {
+                let createPostResponse = try JSONDecoder().decode(CreatePostResponse.self, from: data)
+                let postData = createPostResponse.data.post
+                
+                let post = Post(
+                    id: String(postData.id),
+                    userFullName: postData.user.name,
+                    content: postData.content,
+                    timeAgo: postData.created_at,
+                    commentCount: postData.comments_count,
+                    userProfileImage: postData.user.avatar.isEmpty ? nil : postData.user.avatar,
+                    isLiked: postData.is_liked,
+                    canEdit: postData.can_edit,
+                    image: postData.image.isEmpty ? nil : postData.image
+                )
+                
+                DispatchQueue.main.async {
+                    completion(.success(post))
+                }
+            } catch {
+                print("Error decoding create post response: \(error)")
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.decodingFailed))
+                }
+            }
+        }.resume()
+    }
+    
+    // MARK: - Delete Post
+    func deletePost(postId: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/community/posts/\(postId)") else {
+            completion(.failure(NetworkError.invalidURL))
+            return
+        }
+        
+        let request = createRequest(url: url, method: "DELETE")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            // Log response for debugging
+            logNetworkResponse(data: data, response: response, error: error)
+            
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            // Check if we got a success status code
+            if let httpResponse = response as? HTTPURLResponse,
+               (200...299).contains(httpResponse.statusCode) {
+                DispatchQueue.main.async {
+                    completion(.success(true))
+                }
+            } else {
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.requestFailed))
+                }
+            }
+        }.resume()
+    }
+    
+    // MARK: - Fetch Post Comments
+    func fetchPostComments(postId: String, completion: @escaping (Result<[Comment], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/community/posts/\(postId)/comments") else {
+            completion(.failure(NetworkError.invalidURL))
+            return
+        }
+        
+        let request = createRequest(url: url, method: "GET")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            // Log response for debugging
+            logNetworkResponse(data: data, response: response, error: error)
+            
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.noData))
+                }
+                return
+            }
+            
+            do {
+                let commentsResponse = try JSONDecoder().decode(PaginatedCommentsResponse.self, from: data)
+                
+                let comments = commentsResponse.data.data.map { commentData in
+                    Comment(
+                        id: String(commentData.id),
+                        userFullName: commentData.user.name,
+                        content: commentData.content,
+                        timeAgo: commentData.created_at,
+                        userProfileImage: commentData.user.avatar.isEmpty ? nil : commentData.user.avatar
+                    )
+                }
+                
+                DispatchQueue.main.async {
+                    completion(.success(comments))
+                }
+            } catch {
+                print("Error decoding comments: \(error)")
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.decodingFailed))
+                }
+            }
+        }.resume()
+    }
+    
+    // MARK: - Post Comment
+    func postComment(postId: String, content: String, completion: @escaping (Result<Comment, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/community/posts/\(postId)/comments") else {
+            completion(.failure(NetworkError.invalidURL))
+            return
+        }
+        
+        var request = createRequest(url: url, method: "POST")
+        
+        let parameters = ["content": content]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: parameters)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            // Log response for debugging
+            logNetworkResponse(data: data, response: response, error: error)
+            
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.noData))
+                }
+                return
+            }
+            
+            do {
+                // Try to decode as a CreateCommentResponse
+                let commentResponse = try JSONDecoder().decode(CreateCommentResponse.self, from: data)
+                let commentData = commentResponse.data.comment
+                
+                let comment = Comment(
+                    id: String(commentData.id),
+                    userFullName: commentData.user.name,
+                    content: commentData.content,
+                    timeAgo: commentData.created_at,
+                    userProfileImage: commentData.user.avatar.isEmpty ? nil : commentData.user.avatar
+                )
+                
+                DispatchQueue.main.async {
+                    completion(.success(comment))
+                }
+            } catch {
+                print("Error decoding create comment response: \(error)")
+                DispatchQueue.main.async {
+                    completion(.failure(NetworkError.decodingFailed))
+                }
+            }
+        }.resume()
+    }
+}
+
+
+
+
+//MARK: - RESPONSE MODELS
+// Response models for parsing API responses
+
+import Foundation
+
+// Pagination metadata
+struct PaginationLinks: Codable {
+    let first: String?
+    let last: String?
+    let prev: String?
+    let next: String?
+}
+
+struct PaginationMeta: Codable {
+    let current_page: Int
+    let from: Int?
+    let last_page: Int
+    let links: [PaginationLink]?
+    let path: String
+    let per_page: Int
+    let to: Int?
+    let total: Int
+    
+    struct PaginationLink: Codable {
+        let url: String?
+        let label: String
+        let active: Bool
+    }
+}
+
+// Post Response Models with pagination
+struct PaginatedPostsResponse: Codable {
+    struct Data: Codable {
+        let data: [PostData]
+        let links: PaginationLinks
+        let meta: PaginationMeta
+    }
+    
+    let data: Data
+}
+
+// Single Post Response
+struct SinglePostResponse: Codable {
+    let data: PostData
+}
+
+struct PostData: Codable {
+    let id: Int
+    let content: String
+    let user: UserData
+    let image: String
+    let likes_count: Int
+    let comments_count: Int
+    let is_liked: Bool
+    let can_edit: Bool
+    let created_at: String
+}
+
+// Create Post Response
+struct CreatePostResponse: Codable {
+    struct Data: Codable {
+        let message: String
+        let post: PostData
+    }
+    
+    let data: Data
+}
+
+// Comments Response with pagination
+struct PaginatedCommentsResponse: Codable {
+    struct Data: Codable {
+        let data: [CommentData]
+        let links: PaginationLinks
+        let meta: PaginationMeta
+    }
+    
+    let data: Data
+}
+
+// Create Comment Response
+struct CreateCommentResponse: Codable {
+    struct Data: Codable {
+        let message: String
+        let comment: CommentData
+    }
+    
+    let data: Data
+}
+
+struct CommentData: Codable {
+    let id: Int
+    let content: String
+    let user: UserData
+    let created_at: String
+    let post_id: Int?
+    let can_edit: Bool?
+}
+
+// User Data
+struct UserData: Codable {
+    let id: Int
+    let name: String
+    let avatar: String
+}
+
+
+//MARK: - Models
+import Foundation
+
+// Models used in the UI
+struct Post: Identifiable {
+    let id: String
+    let userFullName: String
+    let content: String
+    let timeAgo: String
+    let commentCount: Int
+    let userProfileImage: String?
+    let isLiked: Bool
+    let canEdit: Bool
+    let image: String?
+}
+
+struct Comment: Identifiable {
+    let id: String
+    let userFullName: String
+    let content: String
+    let timeAgo: String
+    let userProfileImage: String?
+}
+
+
+
+
+import Foundation
+
+// Utility extension to help print network responses when debugging
+extension Data {
+    func prettyPrintedJSONString() -> String? {
+        guard let jsonObject = try? JSONSerialization.jsonObject(with: self, options: []),
+              let jsonData = try? JSONSerialization.data(withJSONObject: jsonObject, options: [.prettyPrinted]),
+              let jsonString = String(data: jsonData, encoding: .utf8) else {
+            return nil
+        }
+        return jsonString
+    }
+}
+
+// Helper function to log network requests in development
+func logNetworkRequest(_ request: URLRequest) {
+    #if DEBUG
+    print("🌐 \(request.httpMethod ?? "GET") \(request.url?.absoluteString ?? "")")
+    
+    if let headers = request.allHTTPHeaderFields, !headers.isEmpty {
+        print("📝 Headers:")
+        headers.forEach { key, value in
+            if key != "Authorization" { // Don't print auth tokens
+                print("  \(key): \(value)")
+            } else {
+                print("  \(key): [REDACTED]")
+            }
+        }
+    }
+    
+    if let body = request.httpBody, !body.isEmpty,
+       let bodyString = body.prettyPrintedJSONString() {
+        print("📦 Body: \(bodyString)")
+    }
+    #endif
+}
+
+// Helper function to log network responses in development
+func logNetworkResponse(data: Data?, response: URLResponse?, error: Error?) {
+    #if DEBUG
+    if let error = error {
+        print("❌ Error: \(error.localizedDescription)")
+        return
+    }
+    
+    guard let httpResponse = response as? HTTPURLResponse else {
+        print("⚠️ Not an HTTP response")
+        return
+    }
+    
+    let statusCodeEmoji = (200...299).contains(httpResponse.statusCode) ? "✅" : "❌"
+    print("\(statusCodeEmoji) Status Code: \(httpResponse.statusCode)")
+    
+    if let data = data, !data.isEmpty, let jsonString = data.prettyPrintedJSONString() {
+        print("📦 Response: \(jsonString)")
+    } else if let data = data, !data.isEmpty, let stringData = String(data: data, encoding: .utf8) {
+        print("📦 Response: \(stringData)")
+    }
+    #endif
 }
