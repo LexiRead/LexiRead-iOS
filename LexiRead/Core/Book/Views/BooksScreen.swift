@@ -467,6 +467,17 @@ class FileService {
     
     // Delete file locally
     func deleteFileLocally(_ pdfFile: PDFFile) {
+        // First check if the file path is a direct path
+        if FileManager.default.fileExists(atPath: pdfFile.fileURL) {
+            do {
+                try FileManager.default.removeItem(at: URL(fileURLWithPath: pdfFile.fileURL))
+                print("File deleted from direct path: \(pdfFile.fileURL)")
+            } catch {
+                print("Error deleting file from direct path: \(error)")
+            }
+        }
+        
+        // Also check documents directory with filename
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let localURL = documentsDirectory.appendingPathComponent(pdfFile.filename)
         
@@ -821,6 +832,7 @@ class BooksViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
+    // In BooksViewModel
     func uploadFile(url: URL) {
             print("Processing file: \(url.lastPathComponent)")
             
@@ -910,29 +922,62 @@ class BooksViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        FileService.shared.deleteDocument(id: pdfFile.id)
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] completion in
-                    self?.isLoading = false
-                    if case .failure(let error) = completion {
-                        self?.errorMessage = error.localizedDescription
+        // Check if it's a local file (high ID) or server file
+        let isLocalFile = pdfFile.id >= 100000
+        
+        if isLocalFile {
+            // Local file - just remove from array and local storage
+            print("Deleting local file: \(pdfFile.filename)")
+            
+            // Delete the file from local storage
+            FileService.shared.deleteFileLocally(pdfFile)
+            
+            // Remove from array
+            pdfFiles.removeAll { $0.id == pdfFile.id }
+            
+            // Save updated list to UserDefaults
+            savePDFFilesToUserDefaults()
+            
+            isLoading = false
+        } else {
+            // Server file - try to delete from server first
+            print("Deleting server file with ID: \(pdfFile.id)")
+            
+            FileService.shared.deleteDocument(id: pdfFile.id)
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { [weak self] completion in
+                        self?.isLoading = false
+                        
+                        if case .failure(let error) = completion {
+                            print("Server delete error: \(error)")
+                            
+                            // Even if server delete fails, remove locally
+                            self?.pdfFiles.removeAll { $0.id == pdfFile.id }
+                            FileService.shared.deleteFileLocally(pdfFile)
+                            self?.savePDFFilesToUserDefaults()
+                        }
+                    },
+                    receiveValue: { [weak self] success in
+                        if success {
+                            // Remove from local array
+                            self?.pdfFiles.removeAll { $0.id == pdfFile.id }
+                            
+                            // Delete locally stored file
+                            FileService.shared.deleteFileLocally(pdfFile)
+                            
+                            // Update UserDefaults
+                            self?.savePDFFilesToUserDefaults()
+                        } else {
+                            // Even if server delete returns false, remove locally
+                            self?.pdfFiles.removeAll { $0.id == pdfFile.id }
+                            FileService.shared.deleteFileLocally(pdfFile)
+                            self?.savePDFFilesToUserDefaults()
+                        }
                     }
-                },
-                receiveValue: { [weak self] success in
-                    if success {
-                        // Remove from local array
-                        self?.pdfFiles.removeAll { $0.id == pdfFile.id }
-                        // Delete locally stored file
-                        FileService.shared.deleteFileLocally(pdfFile)
-                        // Update UserDefaults
-                        self?.savePDFFilesToUserDefaults()
-                    } else {
-                        self?.errorMessage = "Failed to delete document"
-                    }
-                }
-            )
-            .store(in: &cancellables)
+                )
+                .store(in: &cancellables)
+        }
     }
     
     func confirmDelete(pdfFile: PDFFile) {
