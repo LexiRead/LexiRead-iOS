@@ -5,6 +5,7 @@
 //
 //  Created by Abd Elrahman Atallah on 03/03/2025.
 //
+import UIKit
 import SwiftUI
 import Combine
 import PDFKit
@@ -1878,7 +1879,7 @@ struct EmptyPDFView: View {
     }
 }
 
-// MARK: - PDF Viewer Component
+// MARK: - PDF Viewer Component (Updated for Continuous Scrolling)
 struct EnhancedPDFView: UIViewRepresentable {
     let pdfURL: URL
     let onWordSelected: (String) -> Void
@@ -1886,23 +1887,42 @@ struct EnhancedPDFView: UIViewRepresentable {
     func makeUIView(context: Context) -> PDFView {
         let pdfView = PDFView()
         
-        // Configure PDF View
+        // Configure PDF View for continuous scrolling
         pdfView.autoScales = true
-        pdfView.displayMode = .singlePage
+        pdfView.displayMode = .singlePageContinuous  // Changed from .singlePage
         pdfView.displayDirection = .vertical
-        pdfView.usePageViewController(true)
+        pdfView.usePageViewController(false)  // Changed from true to false
         
         // Enable zooming
-        pdfView.minScaleFactor = 0.5
-        pdfView.maxScaleFactor = 5.0
+        pdfView.minScaleFactor = 0.8
+        pdfView.maxScaleFactor = 3.0
         pdfView.scaleFactor = 1.0
+        
+        // Enable scrolling
+        pdfView.isUserInteractionEnabled = true
         
         // Load document
         if let document = PDFDocument(url: pdfURL) {
-            pdfView.document = document
+            // Limit to first 5 pages for large documents
+            if document.pageCount > 25 {
+                let limitedDocument = PDFDocument()
+                for i in 0..<min(25, document.pageCount) {
+                    if let page = document.page(at: i) {
+                        limitedDocument.insert(page, at: i)
+                    }
+                }
+                pdfView.document = limitedDocument
+            } else {
+                pdfView.document = document
+            }
+            
+            // Set initial scale to fit width properly
+            DispatchQueue.main.async {
+                pdfView.scaleFactor = pdfView.scaleFactorForSizeToFit
+            }
         }
         
-        // Add gesture recognizers
+        // Add gesture recognizers (unchanged)
         let doubleTapGesture = UITapGestureRecognizer(
             target: context.coordinator,
             action: #selector(Coordinator.handleDoubleTap(_:))
@@ -1992,13 +2012,16 @@ struct TranslationOverlayView: View {
     }
 }
 
+
+// Add the Copy button to the ActionButtons row in TranslationPopupView
 struct TranslationPopupView: View {
     let translationResult: TranslationResult
     let isTranslating: Bool
     let onDismiss: () -> Void
     @State private var isPlayingAudio = false
     @State private var audioURL: String?
-    @State private var showChatSheet = false  // Add this for the sheet
+    @State private var showChatSheet = false
+    @State private var showCopiedFeedback = false  // For copy feedback
     
     var body: some View {
         VStack(alignment: .trailing, spacing: 16) {
@@ -2045,21 +2068,45 @@ struct TranslationPopupView: View {
             // Action buttons
             HStack(spacing: 20) {
                 AudioButton(
-                    text: translationResult.originalText,
-                    language: translationResult.sourceLanguage,
+                    text: translationResult.translatedText,
+                    language: translationResult.targetLanguage,
                     isPlaying: $isPlayingAudio,
                     audioURL: $audioURL
                 )
                 
-                // Replace the heart icon with chatbot for Lixe Bot
+                // Lixe Bot button
                 ActionButton(icon: "chatbot", title: "Lixe Bot") {
                     // Prepare the question for the chatbot using the original word
-                    let chatQuestion = "What is the meaning of \"\(translationResult.originalText)\"?"
+                    let chatQuestion = "What is the meaning of \"\(translationResult.translatedText)\"?"
                     showChatSheet = true
                 }
                 
-                ActionButton(icon: "wallet.pass", title: "Copy") {
-                    // TODO: Implement share functionality
+                // Copy button
+                Button {
+                    // Copy the original text to clipboard
+                    UIPasteboard.general.string = translationResult.translatedText
+                    
+                    // Show feedback
+                    withAnimation {
+                        showCopiedFeedback = true
+                    }
+                    
+                    // Hide feedback after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            showCopiedFeedback = false
+                        }
+                    }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: showCopiedFeedback ? "checkmark" : "wallet.pass")
+                            .font(.system(size: 20))
+                            .foregroundColor(showCopiedFeedback ? .green : .primary900)
+                        
+                        Text(showCopiedFeedback ? "Copied!" : "Copy")
+                            .font(.caption2)
+                            .foregroundColor(showCopiedFeedback ? .green : .primary900)
+                    }
                 }
                 
                 Spacer()
@@ -2072,11 +2119,9 @@ struct TranslationPopupView: View {
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
-        // Add sheet presentation for ChatScreen
         .sheet(isPresented: $showChatSheet) {
             NavigationView {
-                // Pass the question about the word to the ChatScreen
-                ChatScreen(initialText: "What is the meaning of \"\(translationResult.translatedText)\"?")
+                ChatScreen(initialText: "What is the meaning of \"\(translationResult.originalText)\"?")
             }
         }
     }

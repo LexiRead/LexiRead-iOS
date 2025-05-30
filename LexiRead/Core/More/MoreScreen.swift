@@ -65,7 +65,7 @@ class MoreScreenViewModel: ObservableObject {
                         // Change Password screen
                     },
                     MenuItem(icon: "trash", title: "Delete Account") {
-                        // Delete Account screen
+                       
                     }
                 ]
             )
@@ -119,6 +119,10 @@ struct MoreScreen: View {
                         // Lexi Bot Card
                         LexiBotCard()
                             .padding(.bottom, 8)
+                        
+                        NavigationLink(destination: ChatScreen()) {
+                            Text("chat bot")
+                        }
                         
                         // Collapsible Sections
                         ForEach(Array(viewModel.sections.enumerated()), id: \.element.id) { index, section in
