@@ -25,7 +25,7 @@ struct MainTabView: View {
                 .tag(0)
             
             // Translate Tab
-            Text("Translate Screen")
+            TranslateScreen()
                 .tabItem {
                     Image("translate")
                         .renderingMode(.template)
@@ -67,17 +67,17 @@ struct MainTabView: View {
                 
                 // Set colors for normal state
                 let normalAttributes: [NSAttributedString.Key: Any] = [
-                    .foregroundColor: UIColor(Color("primary900"))
+                    .foregroundColor: UIColor(.gray.opacity(6))
                 ]
                 appearance.stackedLayoutAppearance.normal.titleTextAttributes = normalAttributes
-                appearance.stackedLayoutAppearance.normal.iconColor = UIColor(Color("primary900"))
+                appearance.stackedLayoutAppearance.normal.iconColor = UIColor(.gray.opacity(6))
                 
                 // Set colors for selected state
                 let selectedAttributes: [NSAttributedString.Key: Any] = [
-                    .foregroundColor: UIColor(Color("main"))
+                    .foregroundColor: UIColor(.darkerBlue)
                 ]
                 appearance.stackedLayoutAppearance.selected.titleTextAttributes = selectedAttributes
-                appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color("main"))
+                appearance.stackedLayoutAppearance.selected.iconColor = UIColor(.darkerBlue)
                 
                 // Apply the appearance
                 UITabBar.appearance().standardAppearance = appearance

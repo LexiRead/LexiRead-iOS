@@ -878,6 +878,92 @@ class TranslationService {
     func playAudio(from urlString: String, completion: @escaping () -> Void = {}) {
         AudioPlayerManager.shared.playAudio(from: urlString, completion: completion)
     }
+    
+    
+    
+    // New method specifically for TranslateScreen with dynamic target language
+    func translateTextWithTarget(_ text: String, targetLanguage: String) -> AnyPublisher<TranslationResult, APIError> {
+        // Create the URL
+        guard let url = URL(string: "\(baseURL)/translate") else {
+            return Fail(error: APIError.invalidURL).eraseToAnyPublisher()
+        }
+        
+        // Create the request
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Add authentication token if available
+        if let token = UserManager.shared.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Create the request body with dynamic target language
+        let parameters: [String: Any] = [
+            "text": text,
+            "target": targetLanguage  // Use the provided target language
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: parameters)
+        } catch {
+            return Fail(error: APIError.unknown("Failed to serialize translation request")).eraseToAnyPublisher()
+        }
+        
+        print("Translating text: \(text) to \(targetLanguage)")
+        
+        // Make the network request
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Data in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+                
+                print("Translation response status: \(httpResponse.statusCode)")
+                
+                if !(200...299).contains(httpResponse.statusCode) {
+                    let errorStr = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    print("Translation error response: \(errorStr)")
+                    throw APIError.serverError("Server returned status code \(httpResponse.statusCode)")
+                }
+                
+                return data
+            }
+            .tryMap { data -> TranslationResult in
+                // Print the response for debugging
+                let responseStr = String(data: data, encoding: .utf8) ?? "Unknown response"
+                print("Translation response: \(responseStr)")
+                
+                // Parse the JSON response
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let translation = json["translation"] as? String else {
+                    throw APIError.invalidData
+                }
+                
+                // Create the translation result
+                let result = TranslationResult(
+                    originalText: text,
+                    translatedText: translation,
+                    sourceLanguage: "auto-detect", // Since backend auto-detects
+                    targetLanguage: targetLanguage
+                )
+                
+                return result
+            }
+            .mapError { error in
+                if let apiError = error as? APIError {
+                    return apiError
+                }
+                
+                if let error = error as? DecodingError {
+                    print("JSON parsing error: \(error)")
+                    return APIError.invalidData
+                }
+                
+                return APIError.mapError(error)
+            }
+            .eraseToAnyPublisher()
+    }
 }
 
 
