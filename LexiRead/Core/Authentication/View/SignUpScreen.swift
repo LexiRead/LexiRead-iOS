@@ -666,7 +666,7 @@ import Alamofire
 class NetworkManager {
     static let shared = NetworkManager()
     
-    private let baseURL = APIConstants.baseURL
+    let baseURL = APIConstants.baseURL
     
     private init() {}
     
@@ -837,42 +837,6 @@ class AppState: ObservableObject {
 
 
 
-//
-//  LoadingView.swift
-//  LexiRead
-//
-//  Created on 12/05/2025.
-//
-
-//import SwiftUI
-//
-//struct LoadingView: View {
-//    var body: some View {
-//        ZStack {
-//            Color.black.opacity(0.4)
-//                .edgesIgnoringSafeArea(.all)
-//            
-//            VStack(spacing: 20) {
-//                ProgressView()
-//                    .scaleEffect(1.5)
-//                    .tint(.white)
-//                
-//                Text("Loading...")
-//                    .font(.headline)
-//                    .foregroundColor(.white)
-//            }
-//            .padding(25)
-//            .background(
-//                RoundedRectangle(cornerRadius: 10)
-//                    .fill(Color.gray.opacity(0.7))
-//            )
-//        }
-//    }
-//}
-//
-//#Preview {
-//    LoadingView()
-//}
 
 
 
