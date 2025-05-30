@@ -1,11 +1,21 @@
 
 
 
-
 import SwiftUI
 import Combine
 import AVFoundation
+import PhotosUI
 
+// MARK: - OCR Response Model
+struct OCRResponse: Codable {
+    let extractedText: String
+    let translatedText: String
+    
+    enum CodingKeys: String, CodingKey {
+        case extractedText = "extracted_text"
+        case translatedText = "translated_text"
+    }
+}
 
 // MARK: - ViewModel
 class TranslateViewModel: ObservableObject {
@@ -20,6 +30,9 @@ class TranslateViewModel: ObservableObject {
     @Published var showLanguageSheet: Bool = false
     @Published var isSelectingSourceLanguage: Bool = true
     @Published var showCopiedFeedback: Bool = false
+    @Published var showImagePicker: Bool = false
+    @Published var showCamera: Bool = false
+    @Published var isOCRProcessing: Bool = false
     
     private var cancellables = Set<AnyCancellable>()
     private var debounceTimer: Timer?
@@ -104,6 +117,42 @@ class TranslateViewModel: ObservableObject {
             receiveValue: { [weak self] result in
                 self?.translatedText = result.translatedText
                 print("Translation successful: \(result.translatedText)")
+            }
+        )
+        .store(in: &cancellables)
+    }
+    
+    func processImageWithOCR(_ image: UIImage) {
+        isOCRProcessing = true
+        errorMessage = ""
+        
+        // Convert image to data
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            errorMessage = "Failed to process image"
+            showError = true
+            isOCRProcessing = false
+            return
+        }
+        
+        OCRService.shared.performOCR(
+            imageData: imageData,
+            targetLanguage: getLanguageCode(targetLanguage)
+        )
+        .receive(on: DispatchQueue.main)
+        .sink(
+            receiveCompletion: { [weak self] completion in
+                self?.isOCRProcessing = false
+                
+                if case .failure(let error) = completion {
+                    self?.errorMessage = "OCR failed: \(error.localizedDescription)"
+                    self?.showError = true
+                }
+            },
+            receiveValue: { [weak self] ocrResponse in
+                self?.inputText = ocrResponse.extractedText
+                self?.translatedText = ocrResponse.translatedText
+                print("OCR successful - Extracted: \(ocrResponse.extractedText)")
+                print("OCR Translation: \(ocrResponse.translatedText)")
             }
         )
         .store(in: &cancellables)
@@ -203,6 +252,131 @@ class TranslateViewModel: ObservableObject {
     }
 }
 
+// MARK: - OCR Service
+class OCRService {
+    static let shared = OCRService()
+    private let baseURL = "http://app.elfar5a.com/api/ocr"
+    
+    private init() {}
+    
+    func performOCR(imageData: Data, targetLanguage: String) -> AnyPublisher<OCRResponse, APIError> {
+        guard let url = URL(string: "\(baseURL)/translate") else {
+            return Fail(error: APIError.invalidURL).eraseToAnyPublisher()
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        // Add authentication token if available
+        if let token = UserManager.shared.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Create multipart form data
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        
+        // Add target language parameter
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"target\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(targetLanguage)\r\n".data(using: .utf8)!)
+        
+        // Add image data
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        print("Performing OCR with target language: \(targetLanguage)")
+        
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Data in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+                
+                print("OCR response status: \(httpResponse.statusCode)")
+                
+                if !(200...299).contains(httpResponse.statusCode) {
+                    let errorStr = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    print("OCR error response: \(errorStr)")
+                    throw APIError.serverError("Server returned status code \(httpResponse.statusCode)")
+                }
+                
+                return data
+            }
+            .tryMap { data -> OCRResponse in
+                let responseStr = String(data: data, encoding: .utf8) ?? "Unknown response"
+                print("OCR response: \(responseStr)")
+                
+                let decoder = JSONDecoder()
+                return try decoder.decode(OCRResponse.self, from: data)
+            }
+            .mapError { error in
+                if let apiError = error as? APIError {
+                    return apiError
+                }
+                
+                if let error = error as? DecodingError {
+                    print("JSON parsing error: \(error)")
+                    return APIError.invalidData
+                }
+                
+                return APIError.mapError(error)
+            }
+            .eraseToAnyPublisher()
+    }
+}
+
+// MARK: - Image Picker Coordinator
+class ImagePickerCoordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+    let onImagePicked: (UIImage) -> Void
+    let onCancel: () -> Void
+    
+    init(onImagePicked: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+        self.onImagePicked = onImagePicked
+        self.onCancel = onCancel
+    }
+    
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        if let image = info[.originalImage] as? UIImage {
+            onImagePicked(image)
+        }
+        picker.dismiss(animated: true)
+    }
+    
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        onCancel()
+        picker.dismiss(animated: true)
+    }
+}
+
+// MARK: - Image Picker View
+struct OCRImagePicker: UIViewControllerRepresentable {
+    let sourceType: UIImagePickerController.SourceType
+    let onImagePicked: (UIImage) -> Void
+    let onCancel: () -> Void
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = sourceType
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> ImagePickerCoordinator {
+        ImagePickerCoordinator(onImagePicked: onImagePicked, onCancel: onCancel)
+    }
+}
+
 // MARK: - Main TranslateScreen View
 struct TranslateScreen: View {
     @StateObject private var viewModel = TranslateViewModel()
@@ -230,6 +404,29 @@ struct TranslateScreen: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
                 }
+                
+                // OCR Processing Overlay
+                if viewModel.isOCRProcessing {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .edgesIgnoringSafeArea(.all)
+                        
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
+                            
+                            Text("Processing Image...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+                        .padding(25)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.gray.opacity(0.7))
+                        )
+                    }
+                }
             }
             .navigationTitle("LexiRead")
             .navigationBarTitleDisplayMode(.large)
@@ -250,6 +447,30 @@ struct TranslateScreen: View {
             }
             .sheet(isPresented: $viewModel.showLanguageSheet) {
                 LanguageSelectionSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $viewModel.showImagePicker) {
+                OCRImagePicker(
+                    sourceType: .photoLibrary,
+                    onImagePicked: { image in
+                        viewModel.showImagePicker = false
+                        viewModel.processImageWithOCR(image)
+                    },
+                    onCancel: {
+                        viewModel.showImagePicker = false
+                    }
+                )
+            }
+            .sheet(isPresented: $viewModel.showCamera) {
+                OCRImagePicker(
+                    sourceType: .camera,
+                    onImagePicked: { image in
+                        viewModel.showCamera = false
+                        viewModel.processImageWithOCR(image)
+                    },
+                    onCancel: {
+                        viewModel.showCamera = false
+                    }
+                )
             }
             .onChange(of: viewModel.inputText) { newValue in
                 viewModel.translateText()
@@ -351,15 +572,43 @@ struct TranslateScreen: View {
                             
                             Spacer()
                             
-                            Image(systemName: "camera")
-                                .font(.system(size: 20))
-                                .foregroundColor(.primary900)
+                            // Camera Button with Action Sheet
+                            Button(action: {
+                                showCameraActionSheet()
+                            }) {
+                                Image(systemName: "camera")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.primary900)
+                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
                     }
                 }
             }
+        }
+    }
+    
+    private func showCameraActionSheet() {
+        let alert = UIAlertController(title: "Select Image Source", message: nil, preferredStyle: .actionSheet)
+        
+        // Camera option
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            alert.addAction(UIAlertAction(title: "Camera", style: .default) { _ in
+                viewModel.showCamera = true
+            })
+        }
+        
+        // Photo Library option
+        alert.addAction(UIAlertAction(title: "Photo Library", style: .default) { _ in
+            viewModel.showImagePicker = true
+        })
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            window.rootViewController?.present(alert, animated: true)
         }
     }
     
@@ -465,11 +714,6 @@ struct LanguageSelectionSheet: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Handle bar
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(Color.gray.opacity(0.4))
-                    .frame(width: 40, height: 5)
-                    .padding(.top, 8)
                 
                 ScrollView {
                     LazyVStack(spacing: 12) {
