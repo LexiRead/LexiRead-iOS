@@ -12,87 +12,6 @@ import PDFKit
 import AVFoundation
 
 // MARK: - Models
-struct Book: Identifiable, Codable {
-    let id: Int
-    let title: String
-    let author: String
-    let coverURL: String
-    let downloadLinks: DownloadLinks?
-    
-    enum CodingKeys: String, CodingKey {
-        case id, title, authors, formats
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(Int.self, forKey: .id)
-        title = try container.decode(String.self, forKey: .title)
-        
-        // Handle authors array - can be empty in some cases
-        let authors = try container.decodeIfPresent([Author].self, forKey: .authors) ?? []
-        author = authors.map { $0.name }.joined(separator: ", ")
-        
-        // Extract cover URL from formats
-        let formats = try container.decodeIfPresent([String: String].self, forKey: .formats) ?? [:]
-        coverURL = formats["image/jpeg"] ?? ""
-        
-        // Extract download links
-        downloadLinks = DownloadLinks(
-            pdf: formats["application/pdf"],
-            textHTML: formats["text/html"],
-            epub: formats["application/epub+zip"]
-        )
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(title, forKey: .title)
-        
-        // For encoding, we'll create a simple author array with just the name
-        let authorNames = author.components(separatedBy: ", ")
-        let authors = authorNames.map { Author(name: $0, birthYear: nil, deathYear: nil) }
-        try container.encode(authors, forKey: .authors)
-        
-        // Create formats dictionary
-        var formats: [String: String] = [:]
-        if !coverURL.isEmpty {
-            formats["image/jpeg"] = coverURL
-        }
-        if let links = downloadLinks {
-            if let pdf = links.pdf {
-                formats["application/pdf"] = pdf
-            }
-            if let html = links.textHTML {
-                formats["text/html"] = html
-            }
-            if let epub = links.epub {
-                formats["application/epub+zip"] = epub
-            }
-        }
-        try container.encode(formats, forKey: .formats)
-    }
-    
-    init(id: Int, title: String, author: String, coverURL: String, downloadLinks: DownloadLinks? = nil) {
-        self.id = id
-        self.title = title
-        self.author = author
-        self.coverURL = coverURL
-        self.downloadLinks = downloadLinks
-    }
-}
-
-struct DownloadLinks: Codable {
-    let pdf: String?
-    let textHTML: String?
-    let epub: String?
-    
-    init(pdf: String? = nil, textHTML: String? = nil, epub: String? = nil) {
-        self.pdf = pdf
-        self.textHTML = textHTML
-        self.epub = epub
-    }
-}
 
 struct Author: Codable {
     let name: String
@@ -142,12 +61,6 @@ struct PDFFileResponse: Codable {
     let data: PDFFile
 }
 
-struct BooksResponse: Codable {
-    let count: Int
-    let next: String?
-    let previous: String?
-    let results: [Book]
-}
 
 struct PDFModel: Identifiable {
     let id = UUID()
@@ -165,28 +78,142 @@ struct TranslationResult {
 }
 
 // MARK: - Services
+// MARK: - Updated Models for Internal API
+// MARK: - Updated Models for Internal API
+struct Book: Identifiable, Codable {
+    let id: Int
+    let title: String
+    let author: String
+    let coverURL: String
+    let downloadLinks: DownloadLinks?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, authors
+        case coverURL = "cover_url"
+        case downloadLinks = "download_links"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        
+        // Handle authors array - can be empty in some cases
+        let authors = try container.decodeIfPresent([Author].self, forKey: .authors) ?? []
+        author = authors.map { $0.name }.joined(separator: ", ")
+        
+        // Get cover URL directly
+        coverURL = try container.decodeIfPresent(String.self, forKey: .coverURL) ?? ""
+        
+        // Get download links directly
+        downloadLinks = try container.decodeIfPresent(DownloadLinks.self, forKey: .downloadLinks)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        
+        // For encoding, we'll create a simple author array with just the name
+        let authorNames = author.components(separatedBy: ", ")
+        let authors = authorNames.map { Author(name: $0, birthYear: nil, deathYear: nil) }
+        try container.encode(authors, forKey: .authors)
+        
+        try container.encodeIfPresent(coverURL, forKey: .coverURL)
+        try container.encodeIfPresent(downloadLinks, forKey: .downloadLinks)
+    }
+    
+    init(id: Int, title: String, author: String, coverURL: String, downloadLinks: DownloadLinks? = nil) {
+        self.id = id
+        self.title = title
+        self.author = author
+        self.coverURL = coverURL
+        self.downloadLinks = downloadLinks
+    }
+}
+
+// Update DownloadLinks to match your API format
+struct DownloadLinks: Codable {
+    let pdf: String?
+    let textHTML: String?
+    let epub: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case pdf = "application/pdf"
+        case textHTML = "text/html"
+        case epub = "application/epub+zip"
+    }
+    
+    init(pdf: String? = nil, textHTML: String? = nil, epub: String? = nil) {
+        self.pdf = pdf
+        self.textHTML = textHTML
+        self.epub = epub
+    }
+}
+
+// Update BooksResponse to match your API
+struct BooksResponse: Codable {
+    let data: BooksData
+}
+
+struct BooksData: Codable {
+    let currentPage: Int
+    let nextPage: Int?
+    let previousPage: Int?
+    let results: [Book]
+    
+    enum CodingKeys: String, CodingKey {
+        case currentPage = "current_page"
+        case nextPage = "next_page"
+        case previousPage = "previous_page"
+        case results
+    }
+}
+
+// Simplified BooksService
 class BooksService {
     static let shared = BooksService()
-    private let gutendexURL = "https://gutendex.com/books/?mime_type=application/pdf"
+    private let baseURL = "http://app.elfar5a.com/api/document/explore-gutendex"
     
     private init() {}
     
     func fetchBooks(nextPageURL: String? = nil) -> AnyPublisher<BooksResponse, APIError> {
-        let urlString = nextPageURL ?? gutendexURL
+        let urlString: String
+        if let nextPageURL = nextPageURL {
+            urlString = nextPageURL
+        } else {
+            urlString = "\(baseURL)?mime_type=application/pdf"
+        }
         
         guard let url = URL(string: urlString) else {
             return Fail(error: APIError.invalidURL).eraseToAnyPublisher()
         }
         
+        var request = URLRequest(url: url)
+        
+        if let token = UserManager.shared.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("Fetch books with auth token: Bearer \(token)")
+        }
+        
         print("Fetching books from: \(urlString)")
         
-        return URLSession.shared.dataTaskPublisher(for: url)
+        return URLSession.shared.dataTaskPublisher(for: request)
             .tryMap { data, response -> Data in
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw APIError.invalidResponse
                 }
                 
+                print("Books API response status: \(httpResponse.statusCode)")
+                
+                // Print the actual response to see what's coming back
+                if let responseStr = String(data: data, encoding: .utf8) {
+                    print("Books API response: \(responseStr)")
+                }
+                
                 if !(200...299).contains(httpResponse.statusCode) {
+                    let errorString = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    print("Books API error: \(errorString)")
                     throw APIError.serverError("Server returned status code \(httpResponse.statusCode)")
                 }
                 
@@ -1077,6 +1104,44 @@ class BooksViewModel: ObservableObject {
         fetchPDFFiles()
     }
     
+//    func fetchBooks(forceReload: Bool = false) {
+//        if forceReload {
+//            books = []
+//            nextPageURL = nil
+//            hasMorePages = true
+//        }
+//        
+//        isLoading = true
+//        errorMessage = nil
+//        
+//        BooksService.shared.fetchBooks(nextPageURL: forceReload ? nil : nextPageURL)
+//            .receive(on: DispatchQueue.main)
+//            .sink(
+//                receiveCompletion: { [weak self] completion in
+//                    self?.isLoading = false
+//                    if case .failure(let error) = completion {
+//                        print("Error fetching books: \(error)")
+//                        self?.errorMessage = error.localizedDescription
+//                    }
+//                },
+//                receiveValue: { [weak self] response in
+////                    print("Successfully received \(response.results.count) books")
+//                    self?.nextPageURL = response.next
+//                    self?.hasMorePages = response.next != nil
+//                    
+//                    if forceReload {
+//                        self?.books = response.results
+//                    } else {
+//                        self?.books.append(contentsOf: response.results)
+//                    }
+//                    self?.hasLoadedBooks = true
+//                }
+//            )
+//            .store(in: &cancellables)
+//    }
+    
+    
+    
     func fetchBooks(forceReload: Bool = false) {
         if forceReload {
             books = []
@@ -1098,14 +1163,15 @@ class BooksViewModel: ObservableObject {
                     }
                 },
                 receiveValue: { [weak self] response in
-                    print("Successfully received \(response.results.count) books")
-                    self?.nextPageURL = response.next
-                    self?.hasMorePages = response.next != nil
+                    print("Successfully received \(response.data.results.count) books")
+                    // Update these lines to use response.data instead of response directly
+                    self?.nextPageURL = response.data.nextPage != nil ? "http://app.elfar5a.com/api/document/explore-gutendex/?mime_type=application/pdf&page=\(response.data.nextPage!)" : nil
+                    self?.hasMorePages = response.data.nextPage != nil
                     
                     if forceReload {
-                        self?.books = response.results
+                        self?.books = response.data.results  // Changed from response.results
                     } else {
-                        self?.books.append(contentsOf: response.results)
+                        self?.books.append(contentsOf: response.data.results)  // Changed from response.results
                     }
                     self?.hasLoadedBooks = true
                 }
