@@ -429,17 +429,7 @@ struct TranslateScreen: View {
                 }
             }
             .navigationTitle("LexiRead")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.light, for: .navigationBar)
-            .toolbarBackground(Color.white, for: .navigationBar)
-            .onAppear {
-                let appearance = UINavigationBarAppearance()
-                appearance.configureWithOpaqueBackground()
-                appearance.backgroundColor = UIColor.white
-                appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(Color.primary900)]
-                UINavigationBar.appearance().standardAppearance = appearance
-                UINavigationBar.appearance().scrollEdgeAppearance = appearance
-            }
+            .navigationBarTitleDisplayMode(.automatic)
             .alert("Error", isPresented: $viewModel.showError) {
                 Button("OK") { }
             } message: {
@@ -566,7 +556,7 @@ struct TranslateScreen: View {
                                 .padding(.vertical, 12)
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .fill(.blue)
+                                        .fill(.primary900)
                                 )
                             }
                             

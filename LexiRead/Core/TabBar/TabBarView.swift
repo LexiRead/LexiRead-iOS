@@ -34,7 +34,7 @@ struct MainTabView: View {
                 .tag(1)
             
             // Word List Tab
-            Text("Word List Screen")
+            WordListScreen()
                 .tabItem {
                     Image("WordListIcon")
                         .renderingMode(.template)

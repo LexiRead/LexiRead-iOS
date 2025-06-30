@@ -251,12 +251,12 @@ class LoginViewModel: ObservableObject {
         // even if the user is logged in, to allow for testing/demonstration of the login flow.
         // In a production app, you might want to uncomment the code below:
         
-        /*
-        // Check if user is already logged in
+        
+//         Check if user is already logged in
         if UserManager.shared.isLoggedIn {
             self.navigateToHome = true
         }
-        */
+       
     }
 }
 

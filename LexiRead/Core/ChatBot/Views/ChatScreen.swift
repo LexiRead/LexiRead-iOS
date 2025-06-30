@@ -116,10 +116,7 @@ struct ChatScreen: View {
             // Input Field
             InputFieldView(viewModel: viewModel)
         }
-        // Add a close button in the navigation bar
-        .navigationBarItems(trailing: Button("Close") {
-            presentationMode.wrappedValue.dismiss()
-        })
+        .toolbar(.hidden)
     }
 }
 
@@ -129,16 +126,12 @@ struct HeaderView: View {
     
     var body: some View {
         HStack {
-            Spacer()
-            Spacer()
-            Spacer()
+            BackButton()
             Spacer()
             Text("Lixebot")
                 .font(.title)
                 .foregroundColor(.darkerBlue)
                 .bold()
-            Spacer()
-            Spacer()
             Spacer()
             // Menu button (three dots)
             Button(action: {
@@ -150,6 +143,7 @@ struct HeaderView: View {
             }
         }
         .padding(.horizontal)
+        .padding(.vertical)
     }
 }
 

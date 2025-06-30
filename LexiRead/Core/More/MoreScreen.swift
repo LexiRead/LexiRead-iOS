@@ -332,18 +332,18 @@ struct MoreScreen: View {
                 .hidden()
             }
             .navigationTitle("More")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        // Search action
-                    }) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.title2)
-                            .foregroundColor(.primary900)
-                    }
-                }
-            }
+            .navigationBarTitleDisplayMode(.automatic)
+//            .toolbar {
+//                ToolbarItem(placement: .navigationBarTrailing) {
+//                    Button(action: {
+//                        // Search action
+//                    }) {
+//                        Image(systemName: "magnifyingglass")
+//                            .font(.title2)
+//                            .foregroundColor(.primary900)
+//                    }
+//                }
+//            }
         }
         .confirmationDialog(
             "Delete Account",

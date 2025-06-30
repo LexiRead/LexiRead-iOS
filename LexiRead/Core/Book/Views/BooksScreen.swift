@@ -1566,14 +1566,6 @@ struct BooksScreen: View {
                 .foregroundColor(.primary900)
             Spacer()
             
-            Button(action: {
-                // Search action - to be implemented
-            }) {
-                Image(systemName: "magnifyingglass")
-                    .font(.title2)
-                    .foregroundColor(.primary900)
-            }
-            .padding(.trailing)
         }
         .padding(.vertical)
     }
