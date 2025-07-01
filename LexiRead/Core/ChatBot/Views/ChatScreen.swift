@@ -426,18 +426,16 @@ struct ChatBubble: View {
         HStack {
             if message.isFromUser {
                 Spacer()
-                Text(message.content)
+                FormattedText(content: message.content, isFromUser: true)
                     .padding(12)
                     .background(.darkerBlue)
-                    .foregroundColor(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
             } else {
-                Text(message.content)
+                FormattedText(content: message.content, isFromUser: false)
                     .padding(12)
                     .background(Color(UIColor.systemGray6))
-                    .foregroundColor(.primary)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
@@ -491,4 +489,143 @@ class ChatService {
         }
         .eraseToAnyPublisher()
     }
+}
+
+
+// MARK: - Simple Text Formatting Helper
+struct FormattedText: View {
+    let content: String
+    let isFromUser: Bool
+    
+    var body: some View {
+        Text("\(parseFormattedText())")
+            .foregroundColor(isFromUser ? .white : .primary)
+    }
+    
+    private func parseFormattedText() -> Text {
+        let segments = parseMarkdownSegments(content)
+        var result = Text("")
+        
+        for segment in segments {
+            let textSegment = Text(segment.text)
+            
+            let formattedSegment: Text
+            switch segment.style {
+            case .bold:
+                formattedSegment = textSegment.bold()
+            case .italic:
+                formattedSegment = textSegment.italic()
+            case .code:
+                formattedSegment = textSegment
+                    .font(.system(.body, design: .monospaced))
+                    .padding(.horizontal, 4)
+                    .background(Color(UIColor.systemGray5))
+                    .cornerRadius(4) as! Text
+            case .strikethrough:
+                formattedSegment = textSegment.strikethrough()
+            case .normal:
+                formattedSegment = textSegment
+            }
+            
+            result = result + formattedSegment
+        }
+        
+        return result
+    }
+}
+
+// MARK: - Text Segment Model
+struct TextSegment {
+    let text: String
+    let style: TextStyle
+}
+
+enum TextStyle {
+    case normal
+    case bold
+    case italic
+    case code
+    case strikethrough
+}
+
+// MARK: - Markdown Parser
+func parseMarkdownSegments(_ text: String) -> [TextSegment] {
+    var segments: [TextSegment] = []
+    var currentIndex = text.startIndex
+    
+    while currentIndex < text.endIndex {
+        let remainingText = String(text[currentIndex...])
+        
+        // Check for bold (**text** or __text__)
+        if let boldMatch = findMarkdownMatch(in: remainingText, patterns: ["\\*\\*(.*?)\\*\\*", "__(.*?)__"]) {
+            // Add any text before the match
+            if boldMatch.preText.count > 0 {
+                segments.append(TextSegment(text: boldMatch.preText, style: .normal))
+            }
+            // Add the bold text
+            segments.append(TextSegment(text: boldMatch.content, style: .bold))
+            currentIndex = text.index(currentIndex, offsetBy: boldMatch.fullMatchLength)
+        }
+        // Check for italic (*text* or _text_)
+        else if let italicMatch = findMarkdownMatch(in: remainingText, patterns: ["(?<!\\*)\\*([^*\\n]+)\\*(?!\\*)", "(?<!_)_([^_\\n]+)_(?!_)"]) {
+            if italicMatch.preText.count > 0 {
+                segments.append(TextSegment(text: italicMatch.preText, style: .normal))
+            }
+            segments.append(TextSegment(text: italicMatch.content, style: .italic))
+            currentIndex = text.index(currentIndex, offsetBy: italicMatch.fullMatchLength)
+        }
+        // Check for code (`text`)
+        else if let codeMatch = findMarkdownMatch(in: remainingText, patterns: ["`([^`\\n]+)`"]) {
+            if codeMatch.preText.count > 0 {
+                segments.append(TextSegment(text: codeMatch.preText, style: .normal))
+            }
+            segments.append(TextSegment(text: codeMatch.content, style: .code))
+            currentIndex = text.index(currentIndex, offsetBy: codeMatch.fullMatchLength)
+        }
+        // Check for strikethrough (~~text~~)
+        else if let strikeMatch = findMarkdownMatch(in: remainingText, patterns: ["~~([^~\\n]+)~~"]) {
+            if strikeMatch.preText.count > 0 {
+                segments.append(TextSegment(text: strikeMatch.preText, style: .normal))
+            }
+            segments.append(TextSegment(text: strikeMatch.content, style: .strikethrough))
+            currentIndex = text.index(currentIndex, offsetBy: strikeMatch.fullMatchLength)
+        }
+        // No more matches, add the rest as normal text
+        else {
+            segments.append(TextSegment(text: remainingText, style: .normal))
+            break
+        }
+    }
+    
+    return segments
+}
+
+struct MarkdownMatch {
+    let preText: String
+    let content: String
+    let fullMatchLength: Int
+}
+
+func findMarkdownMatch(in text: String, patterns: [String]) -> MarkdownMatch? {
+    for pattern in patterns {
+        do {
+            let regex = try NSRegularExpression(pattern: pattern, options: [])
+            let range = NSRange(location: 0, length: text.count)
+            
+            if let match = regex.firstMatch(in: text, options: [], range: range) {
+                let preText = String(text.prefix(match.range.location))
+                let capturedContent = (text as NSString).substring(with: match.range(at: 1))
+                
+                return MarkdownMatch(
+                    preText: preText,
+                    content: capturedContent,
+                    fullMatchLength: preText.count + match.range.length
+                )
+            }
+        } catch {
+            print("Regex error for pattern \(pattern): \(error)")
+        }
+    }
+    
+    return nil
 }

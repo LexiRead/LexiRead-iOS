@@ -11,11 +11,12 @@ struct Post: Identifiable, Codable {
     let userFullName: String
     let content: String
     let timeAgo: String
-    let commentCount: Int
+    var commentCount: Int  // Made mutable
     let userProfileImage: String?
-    let isLiked: Bool
+    var isLiked: Bool  // Made mutable
     let canEdit: Bool
     let image: String?
+    var likesCount: Int = 0  // Add likes count
 }
 
 struct Comment: Identifiable, Codable {
@@ -24,6 +25,7 @@ struct Comment: Identifiable, Codable {
     let content: String
     let timeAgo: String
     let userProfileImage: String?
+    let canEdit: Bool  // Add this property
 }
 
 // MARK: - API Response Models
@@ -322,7 +324,8 @@ class CommunityService {
                         userFullName: commentData.user.name,
                         content: commentData.content,
                         timeAgo: commentData.created_at,
-                        userProfileImage: commentData.user.avatar.isEmpty ? nil : commentData.user.avatar
+                        userProfileImage: commentData.user.avatar.isEmpty ? nil : commentData.user.avatar,
+                        canEdit: commentData.can_edit ?? false
                     )
                 }
             }
@@ -342,12 +345,36 @@ class CommunityService {
                     userFullName: commentData.user.name,
                     content: commentData.content,
                     timeAgo: commentData.created_at,
-                    userProfileImage: commentData.user.avatar.isEmpty ? nil : commentData.user.avatar
+                    userProfileImage: commentData.user.avatar.isEmpty ? nil : commentData.user.avatar,
+                    canEdit: commentData.can_edit ?? true  // Assume true for newly created comments
                 )
             }
             .mapError { APIError.mapError($0) }
             .eraseToAnyPublisher()
     }
+    
+    
+    func likePost(postId: String) -> AnyPublisher<Bool, APIError> {
+        return NetworkManager.shared.post(endpoint: "/community/posts/\(postId)/like", parameters: [:], requiresAuth: true)
+            .map { (_: EmptyResponse) -> Bool in
+                return true
+            }
+            .mapError { APIError.mapError($0) }
+            .eraseToAnyPublisher()
+    }
+    
+    // MARK: - Delete Comment
+    func deleteComment(commentId: String) -> AnyPublisher<Bool, APIError> {
+        return NetworkManager.shared.delete(endpoint: "/community/comments/\(commentId)", requiresAuth: true)
+            .map { (_: EmptyResponse) -> Bool in
+                return true
+            }
+            .mapError { APIError.mapError($0) }
+            .eraseToAnyPublisher()
+    }
+    
+    
+    
 }
 
 // Helper extension for multipart form data
@@ -399,7 +426,7 @@ class CommunityViewModel: ObservableObject {
                 guard let self = self else { return }
                 self.forYouPosts = posts
                 if posts.isEmpty {
-                    self.errorMessage = "No posts available"
+//                    self.errorMessage = "No posts available"
                 }
             }
             .store(in: &cancellables)
@@ -423,7 +450,7 @@ class CommunityViewModel: ObservableObject {
                 guard let self = self else { return }
                 self.myPosts = posts
                 if posts.isEmpty {
-                    self.errorMessage = "No posts available"
+//                    self.errorMessage = "No posts available"
                 }
             }
             .store(in: &cancellables)
@@ -500,6 +527,33 @@ class CommunityViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
+    
+    func toggleLike(for post: Post) {
+        // Find the post index
+        if let index = forYouPosts.firstIndex(where: { $0.id == post.id }) {
+            // Toggle the like state locally for immediate UI feedback
+            forYouPosts[index].isLiked.toggle()
+            
+            // Make API call
+            CommunityService.shared.likePost(postId: post.id)
+                .receive(on: DispatchQueue.main)
+                .sink { completion in
+                    if case .failure(let error) = completion {
+                        // Revert the change if API call fails
+                        self.forYouPosts[index].isLiked.toggle()
+                        print("Error toggling like: \(error)")
+                    }
+                } receiveValue: { _ in
+                    // Success - the UI is already updated
+                }
+                .store(in: &cancellables)
+        }
+        
+        // Also check in myPosts if applicable
+        if let index = myPosts.firstIndex(where: { $0.id == post.id }) {
+            myPosts[index].isLiked.toggle()
+        }
+    }
 }
 
 // MARK: - PostDetailViewModel
@@ -532,9 +586,10 @@ class PostDetailViewModel: ObservableObject {
             } receiveValue: { [weak self] comments in
                 guard let self = self else { return }
                 self.comments = comments
-                if comments.isEmpty {
-                    self.errorMessage = "No comments yet"
-                }
+                // Remove this line - don't set errorMessage when comments are empty
+                // if comments.isEmpty {
+                //     self.errorMessage = "No comments yet"
+                // }
             }
             .store(in: &cancellables)
     }
@@ -560,47 +615,38 @@ class PostDetailViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
+    
+    func deleteComment(commentId: String) {
+        CommunityService.shared.deleteComment(commentId: commentId)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case .failure(let error) = completion {
+                    self.errorMessage = "Failed to delete comment: \(error.localizedDescription)"
+                    print("Error deleting comment: \(error)")
+                }
+            } receiveValue: { [weak self] success in
+                guard let self = self, success else { return }
+                // Remove comment from local array
+                self.comments.removeAll { $0.id == commentId }
+            }
+            .store(in: &cancellables)
+    }
 }
 
-//// UI Components for Community Feature
-//
-//import SwiftUI
-//
-//// MARK: - TabButton
-//struct TabButton: View {
-//    let text: String
-//    let isSelected: Bool
-//    let action: () -> Void
-//    
-//    private let appBlueColor = Color.primary900
-//    
-//    var body: some View {
-//        Button(action: action) {
-//            VStack(spacing: 8) {
-//                Text(text)
-//                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
-//                    .foregroundColor(isSelected ? appBlueColor : .gray)
-//                
-//                // Indicator line
-//                Rectangle()
-//                    .fill(isSelected ? appBlueColor : Color.clear)
-//                    .frame(height: 3)
-//            }
-//        }
-//        .frame(maxWidth: .infinity)
-//    }
-//}
+
+
 
 // MARK: - PostCell
 struct PostCell: View {
     let post: Post
+    @EnvironmentObject var viewModel: CommunityViewModel
     
     private let appBlueColor = Color.primary900
     
     var body: some View {
         NavigationLink(destination: PostDetailView(post: post)) {
             VStack(alignment: .leading, spacing: 0) {
-                // Post header with user info
+                // Post header with user info (existing code remains the same)
                 HStack {
                     // Profile image
                     if let imageUrl = post.userProfileImage, !imageUrl.isEmpty {
@@ -680,14 +726,36 @@ struct PostCell: View {
                     .padding(.bottom, 8)
                 }
                 
-                // Comments count
+                // Like and Comments section
                 HStack {
-                    Image(systemName: "bubble.left")
-                        .foregroundColor(.gray)
+                    // Like button
+                    Button(action: {
+                        viewModel.toggleLike(for: post)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: post.isLiked ? "heart.fill" : "heart")
+                                .foregroundColor(post.isLiked ? .red : .gray)
+                            
+                            if post.likesCount > 0 {
+                                Text("\(post.likesCount)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
                     
-                    Text("\(post.commentCount) Comments")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                    Spacer().frame(width: 20)
+                    
+                    // Comments count
+                    HStack {
+                        Image(systemName: "bubble.left")
+                            .foregroundColor(.gray)
+                        
+                        Text("\(post.commentCount) Comments")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
                     
                     Spacer()
                 }
@@ -710,13 +778,14 @@ struct PostCell: View {
 struct MyPostCell: View {
     let post: Post
     let onDeleteTap: () -> Void
+    @EnvironmentObject var viewModel: CommunityViewModel
     
     private let appBlueColor = Color.primary900
     
     var body: some View {
         NavigationLink(destination: PostDetailView(post: post)) {
             VStack(alignment: .leading, spacing: 0) {
-                // Post header with user info
+                // Post header with user info (existing code remains the same)
                 HStack {
                     // Profile image
                     if let imageUrl = post.userProfileImage, !imageUrl.isEmpty {
@@ -792,14 +861,36 @@ struct MyPostCell: View {
                     .padding(.bottom, 8)
                 }
                 
-                // Comments count
+                // Like and Comments section
                 HStack {
-                    Image(systemName: "bubble.left")
-                        .foregroundColor(.gray)
+                    // Like button
+                    Button(action: {
+                        viewModel.toggleLike(for: post)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: post.isLiked ? "heart.fill" : "heart")
+                                .foregroundColor(post.isLiked ? .red : .gray)
+                            
+                            if post.likesCount > 0 {
+                                Text("\(post.likesCount)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
                     
-                    Text("\(post.commentCount) Comments")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                    Spacer().frame(width: 20)
+                    
+                    // Comments count
+                    HStack {
+                        Image(systemName: "bubble.left")
+                            .foregroundColor(.gray)
+                        
+                        Text("\(post.commentCount) Comments")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
                     
                     Spacer()
                 }
@@ -821,6 +912,7 @@ struct MyPostCell: View {
 // MARK: - CommentCell
 struct CommentCell: View {
     let comment: Comment
+    let onDelete: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -857,6 +949,17 @@ struct CommentCell: View {
                     Text(comment.timeAgo)
                         .font(.caption)
                         .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                // Delete button (only show if user can edit/delete)
+                if comment.canEdit {
+                    Button(action: onDelete) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                            .font(.system(size: 14))
+                    }
                 }
             }
             
@@ -952,6 +1055,7 @@ struct CommunityScreen: View {
                 LazyVStack(spacing: 0) {
                     ForEach(viewModel.forYouPosts) { post in
                         PostCell(post: post)
+                            .environmentObject(viewModel)
                     }
                 }
                 .padding(.vertical, 8)
@@ -1029,6 +1133,7 @@ struct MyPostsView: View {
                                 postToDelete = post
                                 showingDeleteAlert = true
                             })
+                            .environmentObject(viewModel)
                         }
                     }
                     .padding(.vertical, 8)
@@ -1311,14 +1416,29 @@ struct PostDetailView: View {
                             .foregroundColor(.red)
                             .padding()
                     } else if viewModel.comments.isEmpty {
-                        Text("No comments yet")
-                            .foregroundColor(.gray)
-                            .padding()
+                        // Empty state placeholder
+                        VStack(spacing: 16) {
+                            Image(systemName: "bubble.left.and.bubble.right")
+                                .font(.system(size: 50))
+                                .foregroundColor(.gray.opacity(0.3))
+                            
+                            Text("No comments yet")
+                                .font(.headline)
+                                .foregroundColor(.gray)
+                            
+                            Text("Be the first to share your thoughts!")
+                                .font(.subheadline)
+                                .foregroundColor(.gray.opacity(0.8))
+                        }
+                        .padding(.vertical, 40)
+                        .frame(maxWidth: .infinity)
                     } else {
                         // Comments list
                         ForEach(viewModel.comments) { comment in
-                            CommentCell(comment: comment)
-                                .padding(.top, 8)
+                            CommentCell(comment: comment, onDelete: {
+                                viewModel.deleteComment(commentId: comment.id)
+                            })
+                            .padding(.top, 8)
                         }
                         .padding(.bottom, 16)
                     }
@@ -1363,6 +1483,8 @@ struct PostDetailView: View {
         .onAppear {
             viewModel.fetchComments()
         }
+        .navigationBarBackButtonHidden()
+        .navigationBarItems(leading: BackButton())
     }
 }
 
@@ -1438,7 +1560,7 @@ extension APIConstants {
 
 // Helper function to log network requests in development
 func logNetworkRequest(_ request: URLRequest) {
-    #if DEBUG
+#if DEBUG
     print("🌐 \(request.httpMethod ?? "GET") \(request.url?.absoluteString ?? "")")
     
     if let headers = request.allHTTPHeaderFields, !headers.isEmpty {
@@ -1456,12 +1578,12 @@ func logNetworkRequest(_ request: URLRequest) {
        let bodyString = String(data: body, encoding: .utf8) {
         print("📦 Body: \(bodyString)")
     }
-    #endif
+#endif
 }
 
 // Helper function to log network responses in development
 func logNetworkResponse(data: Data?, response: URLResponse?, error: Error?) {
-    #if DEBUG
+#if DEBUG
     if let error = error {
         print("❌ Error: \(error.localizedDescription)")
         return
@@ -1482,7 +1604,7 @@ func logNetworkResponse(data: Data?, response: URLResponse?, error: Error?) {
     } else if let data = data, !data.isEmpty, let stringData = String(data: data, encoding: .utf8) {
         print("📦 Response: \(stringData)")
     }
-    #endif
+#endif
 }
 
 // Extension to handle timestamps and convert to readable format

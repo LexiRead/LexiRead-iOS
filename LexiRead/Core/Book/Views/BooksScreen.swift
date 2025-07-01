@@ -1553,6 +1553,8 @@ struct BooksScreen: View {
             }
         }
         .navigationBarHidden(true)
+        .navigationBarBackButtonHidden()
+        .navigationBarItems(leading: BackButton())
     }
     
     // MARK: - UI Components
@@ -1919,11 +1921,15 @@ struct PDFReaderView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(false)
+        .navigationBarBackButtonHidden()
+        .navigationBarItems(leading: BackButton())
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") {
+                Button {
                     presentationMode.wrappedValue.dismiss()
+                } label: {
+                    Text("Done")
+                        .foregroundStyle(.darkerBlue)
                 }
             }
         }

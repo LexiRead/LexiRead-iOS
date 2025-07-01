@@ -57,6 +57,14 @@ struct SignUpScreen: View {
                         trailingIcon: Image(systemName: viewModel.password.isEmpty ? "eye.slash" : "eye.slash.fill")
                     )
                     
+                    LRTextField(
+                        title: "Confirm Password",
+                        placeholder: "Confirm Password",
+                        text: $viewModel.passwordConfirmation,
+                        isSecure: true,
+                        trailingIcon: Image(systemName: viewModel.passwordConfirmation.isEmpty ? "eye.slash" : "eye.slash.fill")
+                    )
+                    
                     if !viewModel.errorMessage.isEmpty {
                         Text(viewModel.errorMessage)
                             .foregroundColor(.red)
@@ -111,6 +119,8 @@ struct SignUpScreen: View {
             }
             .padding()
         }
+        .navigationBarBackButtonHidden()
+        .navigationBarItems(leading: BackButton())
         .overlay(
             Group {
                 if viewModel.isLoading {
@@ -130,7 +140,6 @@ struct SignUpScreen: View {
         .navigationDestination(isPresented: $viewModel.navigateToLogin) {
             LoginScreen()
         }
-        .toolbarVisibility(.hidden)
     }
 }
 
@@ -146,6 +155,13 @@ struct SignUpScreen: View {
 //  Created on 12/05/2025.
 //
 
+//
+//  SignUpViewModel.swift
+//  LexiRead
+//
+//  Created on 12/05/2025.
+//
+
 import Foundation
 import Combine
 
@@ -153,6 +169,7 @@ class SignUpViewModel: ObservableObject {
     @Published var username: String = ""
     @Published var email: String = ""
     @Published var password: String = ""
+    @Published var passwordConfirmation: String = ""
     @Published var agreedToTerms: Bool = false
     @Published var isLoading: Bool = false
     @Published var errorMessage: String = ""
@@ -169,7 +186,7 @@ class SignUpViewModel: ObservableObject {
             return false
         }
         
-        guard !email.isEmpty, email.contains("@"), email.contains(".") else {
+        guard !email.isEmpty, email.isValidEmail else {
             errorMessage = "Please enter a valid email address"
             showError = true
             return false
@@ -177,6 +194,18 @@ class SignUpViewModel: ObservableObject {
         
         guard password.count >= 6 else {
             errorMessage = "Password must be at least 6 characters"
+            showError = true
+            return false
+        }
+        
+        guard !passwordConfirmation.isEmpty else {
+            errorMessage = "Please confirm your password"
+            showError = true
+            return false
+        }
+        
+        guard password == passwordConfirmation else {
+            errorMessage = "Passwords do not match"
             showError = true
             return false
         }
@@ -229,7 +258,7 @@ class SignUpViewModel: ObservableObject {
             name: username,
             email: email,
             password: password,
-            passwordConfirmation: password // Using the same value for password confirmation
+            passwordConfirmation: passwordConfirmation // Using the actual password confirmation field
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] completion in
@@ -249,7 +278,6 @@ class SignUpViewModel: ObservableObject {
         .store(in: &cancellables)
     }
 }
-
 
 
 
@@ -819,18 +847,18 @@ class AppState: ObservableObject {
     }
     
     func logout() {
-        isLoading = true
-        
-        AuthService.shared.logout()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] success in
-                guard let self = self else { return }
-                self.isLoading = false
-                if success {
-                    self.isAuthenticated = false
-                }
-            }
-            .store(in: &cancellables)
+//        isLoading = true
+//        
+//        AuthService.shared.logout()
+//            .receive(on: DispatchQueue.main)
+//            .sink { [weak self] success in
+//                guard let self = self else { return }
+//                self.isLoading = false
+//                if success {
+//                    self.isAuthenticated = false
+//                }
+//            }
+//            .store(in: &cancellables)
     }
 }
 

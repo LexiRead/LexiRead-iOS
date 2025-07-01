@@ -97,6 +97,8 @@ struct LoginScreen: View {
             }
             .padding(.bottom)
         }
+        .navigationBarBackButtonHidden()
+        .navigationBarItems(leading: BackButton())
         .padding(.horizontal)
         .overlay(
             Group {

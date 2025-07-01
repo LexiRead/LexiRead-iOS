@@ -75,10 +75,8 @@ struct ResetPasswordScreen: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-//        .navigationBarBackButtonHidden(true)
-//        .navigationBarItems(leading: BackButton {
-//            presentationMode.wrappedValue.dismiss()
-//        })
+        .navigationBarBackButtonHidden()
+        .navigationBarItems(leading: BackButton())
         .overlay(
             Group {
                 if viewModel.isLoading {

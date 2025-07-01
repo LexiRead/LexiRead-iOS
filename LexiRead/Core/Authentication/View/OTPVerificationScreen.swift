@@ -111,6 +111,8 @@ struct OTPVerificationScreen: View {
                 }
             }
         )
+        .navigationBarBackButtonHidden()
+        .navigationBarItems(leading: BackButton())
         .navigationDestination(isPresented: $viewModel.navigateToResetPasswordScreen) {
             ResetPasswordScreen()
         }
