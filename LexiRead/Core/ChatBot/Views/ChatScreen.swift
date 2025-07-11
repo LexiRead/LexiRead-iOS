@@ -78,13 +78,14 @@ extension APIConstants.Endpoints {
 
 
 // Update ChatScreen to accept an optional initial message
+
+
 struct ChatScreen: View {
     @StateObject private var viewModel: ChatViewModel
     @Environment(\.presentationMode) var presentationMode
     
     // Initialize with optional initial text
     init(initialText: String? = nil) {
-        // Use StateObject with a custom initializer that takes the initial text
         _viewModel = StateObject(wrappedValue: ChatViewModel(initialText: initialText))
     }
     
@@ -97,7 +98,7 @@ struct ChatScreen: View {
                         title: Text("Delete Conversation"),
                         message: Text("Are you sure you want to delete the entire conversation? This action cannot be undone."),
                         primaryButton: .destructive(Text("Delete")) {
-                            viewModel.clearChat() // Use the animated clear method
+                            viewModel.clearChat()
                         },
                         secondaryButton: .cancel()
                     )

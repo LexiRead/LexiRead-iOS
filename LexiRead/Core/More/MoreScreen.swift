@@ -124,7 +124,7 @@ class MoreScreenViewModel: ObservableObject {
             MenuSection(
                 title: "Settings",
                 icon: "gear",
-                isExpanded: true,
+                isExpanded: false,
                 iconColor: .primary900,
                 backgroundColor: Color.primary900.opacity(0.1),
                 items: [

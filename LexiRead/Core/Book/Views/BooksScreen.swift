@@ -623,8 +623,18 @@ class PDFService {
         task.resume()
     }
     
+    // REPLACE the existing downloadBookPDF method with this
     func downloadBookPDF(for book: Book) -> AnyPublisher<URL, APIError> {
         return Future { promise in
+            // Check if already downloaded
+            if let localURL = self.getLocalURLForBook(book) {
+                print("Using cached book PDF: \(localURL.path)")
+                DispatchQueue.main.async {
+                    promise(.success(localURL))
+                }
+                return
+            }
+            
             let sanitizedTitle = book.title.replacingOccurrences(of: " ", with: "_")
                 .replacingOccurrences(of: "/", with: "-")
                 .replacingOccurrences(of: ":", with: "_")
@@ -632,24 +642,14 @@ class PDFService {
             let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             let destinationURL = documentsDirectory.appendingPathComponent(filename)
             
-            // Check if already downloaded
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                let fileSize = (try? FileManager.default.attributesOfItem(atPath: destinationURL.path)[.size] as? Int64) ?? 0
-                if fileSize > 1000 {
-                    print("Using existing book PDF: \(destinationURL.path)")
-                    DispatchQueue.main.async {
-                        promise(.success(destinationURL))
-                    }
-                    return
-                }
-            }
-            
             // Try to download from available links
             if let pdfURL = book.downloadLinks?.pdf,
                let url = URL(string: pdfURL) {
                 print("Downloading book PDF from: \(pdfURL)")
                 self.downloadFile(from: url, to: destinationURL) { success in
                     if success {
+                        // Save to UserDefaults
+                        self.saveBookToDefaults(book, localURL: destinationURL)
                         DispatchQueue.main.async {
                             promise(.success(destinationURL))
                         }
@@ -720,6 +720,62 @@ class PDFService {
                 promise(.failure(APIError.invalidData))
             }
         }
+    }
+    // Add these methods to PDFService class
+    private func saveBookToDefaults(_ book: Book, localURL: URL) {
+        // Save PDF file mapping
+        var savedBooks = getSavedBooksFromDefaults()
+        savedBooks[book.id] = localURL.lastPathComponent
+        
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(savedBooks) {
+            UserDefaults.standard.set(encoded, forKey: UserDefaultKeys.downloadedBookPDFs)
+        }
+        
+        // Also save book data
+        saveBookDataToDefaults(book)
+    }
+
+     func getSavedBooksFromDefaults() -> [Int: String] {
+        guard let data = UserDefaults.standard.data(forKey: UserDefaultKeys.downloadedBookPDFs) else {
+            return [:]
+        }
+        
+        let decoder = JSONDecoder()
+        return (try? decoder.decode([Int: String].self, from: data)) ?? [:]
+    }
+
+     func getLocalURLForBook(_ book: Book) -> URL? {
+        let savedBooks = getSavedBooksFromDefaults()
+        guard let filename = savedBooks[book.id] else { return nil }
+        
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let localURL = documentsDirectory.appendingPathComponent(filename)
+        
+        return FileManager.default.fileExists(atPath: localURL.path) ? localURL : nil
+    }
+
+     func saveBookDataToDefaults(_ book: Book) {
+        var savedBooksData = getSavedBooksDataFromDefaults()
+        
+        // Add book if not already saved
+        if !savedBooksData.contains(where: { $0.id == book.id }) {
+            savedBooksData.append(book)
+            
+            let encoder = JSONEncoder()
+            if let encoded = try? encoder.encode(savedBooksData) {
+                UserDefaults.standard.set(encoded, forKey: UserDefaultKeys.savedBooks)
+            }
+        }
+    }
+
+     func getSavedBooksDataFromDefaults() -> [Book] {
+        guard let data = UserDefaults.standard.data(forKey: UserDefaultKeys.savedBooks) else {
+            return []
+        }
+        
+        let decoder = JSONDecoder()
+        return (try? decoder.decode([Book].self, from: data)) ?? []
     }
 }
 
@@ -1142,9 +1198,10 @@ class BooksViewModel: ObservableObject {
     
     
     
+    // REPLACE the existing fetchBooks method with this
     func fetchBooks(forceReload: Bool = false) {
+        // Don't clear books immediately when force reloading - wait to see if we can fetch new ones
         if forceReload {
-            books = []
             nextPageURL = nil
             hasMorePages = true
         }
@@ -1159,38 +1216,51 @@ class BooksViewModel: ObservableObject {
                     self?.isLoading = false
                     if case .failure(let error) = completion {
                         print("Error fetching books: \(error)")
-                        self?.errorMessage = error.localizedDescription
+                        
+                        // Get offline books
+                        let offlineBooks = self?.getAllOfflineBooks() ?? []
+                        
+                        if offlineBooks.isEmpty {
+                            // Only show error if no offline books are available
+                            self?.errorMessage = error.localizedDescription
+                            if forceReload {
+                                self?.books = [] // Clear only if no offline books
+                            }
+                        } else {
+                            // Show offline books instead of error
+                            self?.books = offlineBooks
+                            self?.errorMessage = nil
+                            print("Showing \(offlineBooks.count) offline books")
+                        }
                     }
                 },
                 receiveValue: { [weak self] response in
                     print("Successfully received \(response.data.results.count) books")
-                    // Update these lines to use response.data instead of response directly
-                    self?.nextPageURL = response.data.nextPage != nil ? "http://app.elfar5a.com/api/document/explore-gutendex/?mime_type=application/pdf&page=\(response.data.nextPage!)" : nil
+                    self?.nextPageURL = response.data.nextPage != nil ? "http://app.elfar5a.com/api/document/explore-gutendx/?mime_type=application/pdf&page=\(response.data.nextPage!)" : nil
                     self?.hasMorePages = response.data.nextPage != nil
                     
+                    // Now we can safely clear and replace with new data
                     if forceReload {
-                        self?.books = response.data.results  // Changed from response.results
+                        self?.books = response.data.results
                     } else {
-                        self?.books.append(contentsOf: response.data.results)  // Changed from response.results
+                        self?.books.append(contentsOf: response.data.results)
                     }
                     self?.hasLoadedBooks = true
+                    self?.errorMessage = nil // Clear any previous error
                 }
             )
             .store(in: &cancellables)
     }
     
     func fetchPDFFiles(forceReload: Bool = false) {
-        // Don't clear existing files
         isLoading = true
         errorMessage = nil
         
-        // First load local files
+        // Always load local files first
         loadPDFFilesFromUserDefaults()
+        let localFiles = pdfFiles.filter { $0.id >= 100000 } // Keep local files
         
-        // Keep track of local files (those without server IDs or with high random IDs)
-        let localFiles = pdfFiles.filter { $0.id >= 100000 } // Assuming local IDs start from 100000
-        
-        // Then fetch from API
+        // Then try to fetch from API
         FileService.shared.fetchDocuments()
             .receive(on: DispatchQueue.main)
             .sink(
@@ -1198,33 +1268,25 @@ class BooksViewModel: ObservableObject {
                     self?.isLoading = false
                     if case .failure(let error) = completion {
                         print("Error fetching PDF files: \(error)")
-                        // Don't show error if we have local files
-                        if self?.pdfFiles.isEmpty ?? true {
-                            self?.errorMessage = "Could not load files from server: \(error.localizedDescription)"
-                        }
+                        
+                        // Always keep local files, never show error for MY Files tab
+                        self?.pdfFiles = localFiles
+                        self?.errorMessage = nil // Don't show error message
+                        print("Showing \(localFiles.count) local files (server unavailable)")
                     }
                 },
                 receiveValue: { [weak self] serverFiles in
                     print("Successfully received \(serverFiles.count) PDF files from server")
                     
-                    // Only replace server files (those with IDs < 100000)
                     if let self = self {
-                        // Remove existing server files
-                        self.pdfFiles.removeAll { $0.id < 100000 }
+                        // Combine local files with server files
+                        var combinedFiles = localFiles
+                        combinedFiles.append(contentsOf: serverFiles)
                         
-                        // Add server files
-                        self.pdfFiles.append(contentsOf: serverFiles)
-                        
-                        // Make sure local files are still there
-                        for localFile in localFiles {
-                            if !self.pdfFiles.contains(where: { $0.id == localFile.id }) {
-                                self.pdfFiles.append(localFile)
-                            }
-                        }
-                        
+                        self.pdfFiles = combinedFiles
                         self.savePDFFilesToUserDefaults()
                         self.hasLoadedPDFs = true
-                        self.isLoading = false
+                        self.errorMessage = nil
                     }
                 }
             )
@@ -1233,47 +1295,47 @@ class BooksViewModel: ObservableObject {
     
     // In BooksViewModel
     func uploadFile(url: URL) {
-            print("Processing file: \(url.lastPathComponent)")
-            
-            // Verify the file exists
-            guard FileManager.default.fileExists(atPath: url.path) else {
-                errorMessage = "File not found: \(url.lastPathComponent)"
-                return
-            }
-            
-            // Get file size
-            let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
-            print("File size: \(fileSize) bytes")
-            
-            if fileSize == 0 {
-                errorMessage = "File is empty"
-                return
-            }
-            
-            // Generate a user-friendly title
-            let fileName = url.deletingPathExtension().lastPathComponent
-            let title = fileName.replacingOccurrences(of: "_", with: " ")
-                             .replacingOccurrences(of: "-", with: " ")
-            
-            // Create a PDF file entry
-            let newPDF = PDFFile(
-                id: Int.random(in: 100000...999999),
-                title: title,
-                author: UserManager.shared.userName ?? "User",
-                description: nil,
-                fileURL: url.path,
-                filename: url.lastPathComponent,
-                fileType: FileService.shared.mimeType(for: url),
-                coverURL: "",
-                createdAt: ISO8601DateFormatter().string(from: Date())
-            )
-            
-            // Add to our collection
-            pdfFiles.append(newPDF)
-            savePDFFilesToUserDefaults()
-            
-            print("Added local PDF file: \(title)")
+        print("Processing file: \(url.lastPathComponent)")
+        
+        // Verify the file exists
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            errorMessage = "File not found: \(url.lastPathComponent)"
+            return
         }
+        
+        // Get file size
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+        print("File size: \(fileSize) bytes")
+        
+        if fileSize == 0 {
+            errorMessage = "File is empty"
+            return
+        }
+        
+        // Generate a user-friendly title
+        let fileName = url.deletingPathExtension().lastPathComponent
+        let title = fileName.replacingOccurrences(of: "_", with: " ")
+                             .replacingOccurrences(of: "-", with: " ")
+        
+        // Create a PDF file entry
+        let newPDF = PDFFile(
+            id: Int.random(in: 100000...999999),
+            title: title,
+            author: UserManager.shared.userName ?? "User",
+            description: nil,
+            fileURL: url.path,
+            filename: url.lastPathComponent,
+            fileType: FileService.shared.mimeType(for: url),
+            coverURL: "",
+            createdAt: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        // Add to our collection
+        pdfFiles.append(newPDF)
+        savePDFFilesToUserDefaults()  // Make sure this is called
+        
+        print("Added local PDF file: \(title)")
+    }
 
     // Improved fallback for local files
     private func createLocalOnlyFile(url: URL, title: String) {
@@ -1412,6 +1474,66 @@ class BooksViewModel: ObservableObject {
         } else {
             print("No saved PDF files found in UserDefaults")
         }
+    }
+    
+    // CHANGE from private to public
+    func getOfflineBooks() -> [Book] {
+        let savedBooks = getSavedBooksFromDefaults()
+        let savedBooksData = getSavedBooksDataFromDefaults()
+        
+        var offlineBooks: [Book] = []
+        
+        // Get books from saved book data
+        for bookData in savedBooksData {
+            if let filename = savedBooks[bookData.id] {
+                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let localURL = documentsDirectory.appendingPathComponent(filename)
+                if FileManager.default.fileExists(atPath: localURL.path) {
+                    offlineBooks.append(bookData)
+                }
+            }
+        }
+        
+        return offlineBooks
+    }
+    
+    // Add these methods to BooksViewModel class
+    private func getAllOfflineBooks() -> [Book] {
+        let savedBooks = getSavedBooksFromDefaults()
+        let savedBooksData = getSavedBooksDataFromDefaults()
+        
+        var offlineBooks: [Book] = []
+        
+        // Get books from saved book data
+        for bookData in savedBooksData {
+            if let filename = savedBooks[bookData.id] {
+                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let localURL = documentsDirectory.appendingPathComponent(filename)
+                if FileManager.default.fileExists(atPath: localURL.path) {
+                    offlineBooks.append(bookData)
+                }
+            }
+        }
+        
+        return offlineBooks
+    }
+
+    private func getSavedBooksFromDefaults() -> [Int: String] {
+        guard let data = UserDefaults.standard.data(forKey: UserDefaultKeys.downloadedBookPDFs) else {
+            return [:]
+        }
+        
+        let decoder = JSONDecoder()
+        return (try? decoder.decode([Int: String].self, from: data)) ?? [:]
+    }
+
+    private func getSavedBooksDataFromDefaults() -> [Book] {
+        guard let data = UserDefaults.standard.data(forKey: UserDefaultKeys.savedBooks) else {
+            return []
+        }
+        
+        let decoder = JSONDecoder()
+        return (try? decoder.decode([Book].self, from: data)) ?? []
     }
 }
 
@@ -1603,47 +1725,101 @@ struct BooksScreen: View {
     }
     
     private var booksGridView: some View {
-        ScrollView {
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 16) {
-                if selectedTab == 0 {
-                    ForEach(viewModel.books) { book in
-                        NavigationLink(
-                            destination: PDFReaderView(book: book)
-                        ) {
-                            PDFCard(
-                                title: book.title,
-                                subtitle: book.author,  // Always show author for books
-                                imageURL: book.coverURL,
-                                isPDF: false
-                            )
-                            .onAppear {
-                                viewModel.checkIfNeedMoreBooks(for: book.id)
+        Group {
+            if selectedTab == 0 {
+                // Books tab content
+                ScrollView {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 16) {
+                        let booksToShow = viewModel.errorMessage != nil ? viewModel.getOfflineBooks() : viewModel.books
+                        
+                        ForEach(booksToShow) { book in
+                            NavigationLink(
+                                destination: PDFReaderView(book: book)
+                            ) {
+                                PDFCard(
+                                    title: book.title,
+                                    subtitle: book.author,
+                                    imageURL: book.coverURL,
+                                    isPDF: false
+                                )
+                                .onAppear {
+                                    if viewModel.errorMessage == nil {
+                                        viewModel.checkIfNeedMoreBooks(for: book.id)
+                                    }
+                                }
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        
+                        if viewModel.isLoading && !viewModel.books.isEmpty && viewModel.errorMessage == nil {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                        }
+                        
+                        if viewModel.errorMessage != nil && booksToShow.isEmpty {
+                            Text("No offline books available")
+                                .foregroundColor(.gray)
+                                .padding()
+                        }
+                    }
+                    .padding()
+                }
+            } else {
+                // PDF Files tab content
+                if viewModel.pdfFiles.isEmpty && !viewModel.isLoading {
+                    // Empty state - centered
+                    VStack {
+                        Spacer()
+                        VStack(spacing: 16) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 50))
+                                .foregroundColor(.gray)
+                            
+                            Text("No Files Yet")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.gray)
+                            
+                            Text("Tap the + button to upload your first PDF file")
+                                .font(.body)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding()
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // Files list
+                    ScrollView {
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: 16) {
+                            ForEach(viewModel.pdfFiles) { pdf in
+                                PDFFileCard(
+                                    pdf: pdf,
+                                    onDelete: {
+                                        viewModel.confirmDelete(pdfFile: pdf)
+                                    },
+                                    isLexiBooks: false
+                                )
+                            }
+                            
+                            if viewModel.isLoading && !viewModel.pdfFiles.isEmpty {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
                             }
                         }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                    
-                    if viewModel.isLoading && !viewModel.books.isEmpty {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                    }
-                } else {
-                    ForEach(viewModel.pdfFiles) { pdf in
-                        PDFFileCard(
-                            pdf: pdf,
-                            onDelete: {
-                                viewModel.confirmDelete(pdfFile: pdf)
-                            },
-                            isLexiBooks: false  // Pass false for MY Files tab
-                        )
+                        .padding()
                     }
                 }
             }
-            .padding()
         }
     }
     
@@ -2218,16 +2394,20 @@ struct TranslationPopupView: View {
             // Action buttons
             HStack(spacing: 20) {
                 AudioButton(
-                    text: translationResult.translatedText,
+                    text: translationResult.originalText,
                     language: translationResult.targetLanguage,
                     isPlaying: $isPlayingAudio,
                     audioURL: $audioURL
                 )
                 
                 // Lixe Bot button
-                ActionButton(icon: "chatbot", title: "Lixe Bot") {
-                    // Prepare the question for the chatbot using the original word
-                    let chatQuestion = "What is the meaning of \"\(translationResult.translatedText)\"?"
+                ActionButton(icon: "newspaper", title: "Simplify") {
+                    
+                    showChatSheet = true
+                }
+
+                ActionButton(icon: "doc.text.magnifyingglass", title: "Define") {
+                   
                     showChatSheet = true
                 }
                 
@@ -2271,7 +2451,7 @@ struct TranslationPopupView: View {
         )
         .sheet(isPresented: $showChatSheet) {
             NavigationView {
-                ChatScreen(initialText: "What is the meaning of \"\(translationResult.originalText)\"?")
+                ChatScreen(initialText: "Explain the Following \"\(translationResult.originalText)\"?")
             }
         }
     }
@@ -2286,7 +2466,7 @@ struct ActionButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(icon)
+                Image(systemName: icon)
                     .font(.system(size: 20))
                     .foregroundColor(.primary900)
                 
@@ -2452,6 +2632,8 @@ struct DocumentPickerView: UIViewControllerRepresentable {
 
 extension UserDefaultKeys {
     static let savedPDFFiles = "savedPDFFiles"
+    static let savedBooks = "savedBooks"           // ADD THIS
+    static let downloadedBookPDFs = "downloadedBookPDFs"  // ADD THIS
 }
 
 
